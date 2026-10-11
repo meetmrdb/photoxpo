@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photoxpo PROTOTYPE – onboarding and Preview quality chooser</title>
+<!--
+  PROTOTYPE, THROWAWAY. Wayfinder ticket "Prototype the onboarding flow and Preview quality chooser".
+  Question: what does first-run look like for a non-technical person, and how does the 3-preset chooser work?
+  Flow: Welcome -> Photos access -> Archive Drive -> Preview quality -> Ready. Chooser re-shown inside Free up space.
+  Look follows the home-gallery-load prototype (layout A). Photos are drawn placeholders; sizes and counts are made up.
+-->
+<style>
+:root{--p:#0B5C63;--on-p:#fff;--pc:#C4EBEA;--on-pc:#00201F;--sc:#CCE8E5;--on-sc:#05201E;--bg:#F6FAF9;--surf:#EAF1F0;--surf-hi:#DDE7E6;--on:#161D1D;--var:#3F4948;--outline:#6F7978;--outv:#BEC9C8;--err:#B3261E;--errc:#F9DEDC;--on-errc:#410E0B;--warn:#FFDEA1;--on-warn:#3E2D00;--scrim:rgba(10,16,16,.62);--fs:1;--ease:cubic-bezier(.16,1,.3,1)}
+body[data-theme=dark]{--p:#7BD5DA;--on-p:#003739;--pc:#004F53;--on-pc:#C4EBEA;--sc:#2F4B49;--on-sc:#CCE8E5;--bg:#0E1514;--surf:#192020;--surf-hi:#252D2D;--on:#DDE4E3;--var:#BEC9C8;--outline:#889392;--outv:#3F4948;--err:#FFB4AB;--errc:#93000A;--on-errc:#FFDAD6;--warn:#5A4300;--on-warn:#FFDEA1}
+*{box-sizing:border-box;margin:0}
+body{font:14px/1.4 Roboto,"Segoe UI",system-ui,sans-serif;background:#cfd8d7;color:#162020;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;justify-content:center;padding:20px 16px 40px}
+body[data-theme=dark]{background:#0a0f0f;color:#dde4e3}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:3px solid var(--p);outline-offset:2px}
+#panel{width:300px;background:#fff;border:2px dashed #7a8a89;border-radius:14px;padding:16px;color:#162020;font-size:13px}
+body[data-theme=dark] #panel{background:#151c1c;color:#dde4e3;border-color:#556}
+#panel h2{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#a33;margin-bottom:10px}
+#panel h3{font-size:13px;margin:14px 0 6px}
+#panel .row{display:flex;flex-direction:column;gap:6px}
+#panel button.pre{padding:9px 10px;border-radius:8px;border:1px solid #9aa;text-align:left;min-height:40px}
+#panel button.pre[aria-pressed=true]{background:#0B5C63;color:#fff;border-color:#0B5C63}
+#panel label{display:flex;gap:8px;align-items:center;min-height:30px}
+#panel select{font:inherit;padding:6px;border-radius:6px;width:100%}
+#panel pre{font:11px/1.35 ui-monospace,monospace;background:#0001;padding:8px;border-radius:8px;white-space:pre-wrap;margin-top:8px}
+#panel .note{opacity:.75;margin-top:8px;font-size:12px}
+#stage{width:412px;height:892px;flex:none;order:-1}
+#phone{width:412px;height:892px;border-radius:44px;background:#000;padding:10px;box-shadow:0 18px 40px #0004,0 0 0 2px #2a2f2f}
+#screen{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;background:var(--bg);color:var(--on);display:flex;flex-direction:column}
+.sb{height:34px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-size:13px;font-weight:500}
+.gesture{height:22px;flex:none;display:flex;justify-content:center;align-items:center}.gesture b{width:120px;height:4px;border-radius:2px;background:var(--on);opacity:.5}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden}
+.hs{font-size:calc(28px*var(--fs));line-height:1.2;font-weight:500;letter-spacing:-.01em;text-wrap:balance}
+.tl{font-size:calc(22px*var(--fs));line-height:1.25;font-weight:500}
+.tm{font-size:calc(16px*var(--fs));line-height:1.4;font-weight:500}
+.bl{font-size:calc(16px*var(--fs));line-height:1.45}
+.bm{font-size:calc(14px*var(--fs));line-height:1.4}
+.lm{font-size:calc(12px*var(--fs));font-weight:500;letter-spacing:.02em}
+.var{color:var(--var)}
+svg.ic{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 24px;border-radius:28px;font-size:calc(16px*var(--fs));font-weight:500;background:var(--p);color:var(--on-p);width:100%}
+.btn:active{transform:scale(.98)}
+.btn.tonal{background:var(--sc);color:var(--on-sc)}
+.btn.text{background:none;color:var(--p);min-height:48px;width:auto;padding:0 16px}
+.btn[disabled]{background:var(--surf-hi);color:var(--var);cursor:default}
+.card{background:var(--surf);border-radius:20px;padding:18px}
+.stack{display:flex;flex-direction:column;gap:16px}
+.pad{padding:8px 20px 20px}
+.foot{padding:12px 20px 8px;display:flex;flex-direction:column;gap:6px;align-items:center;flex:none}
+.appbar{display:flex;align-items:center;gap:4px;min-height:64px;padding:0 8px 0 4px;flex:none}
+.appbar .tl{flex:1;padding-left:8px}
+.iconbtn{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;border-radius:24px}
+.dots{display:flex;gap:6px;justify-content:center;padding:4px 0 2px}.dots i{width:8px;height:8px;border-radius:4px;background:var(--outv)}.dots i.on{background:var(--p);width:22px}
+.hero{width:132px;height:132px;border-radius:40px;background:var(--pc);color:var(--on-pc);display:flex;align-items:center;justify-content:center;margin:12px auto 8px}
+.hero svg{width:64px;height:64px;stroke-width:1.6}
+.pair{display:flex;gap:10px;align-items:center}
+.pair .box{flex:1;border-radius:16px;overflow:hidden;position:relative;aspect-ratio:1;background:var(--surf)}
+.pair .box svg,.pair .box canvas{position:absolute;inset:0;width:100%;height:100%}
+.pair .lab{position:absolute;left:6px;bottom:6px;background:var(--scrim);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500}
+.row3{display:flex;align-items:flex-start;gap:12px}
+.row3 .ic{margin-top:2px;color:var(--p)}
+.opt{display:flex;flex-direction:column;gap:8px;text-align:left;width:100%;border:2px solid var(--outv);border-radius:20px;padding:10px;background:var(--bg)}
+.opt[aria-checked=true]{border-color:var(--p);background:var(--pc);color:var(--on-pc)}
+.opt .top{display:flex;gap:12px;align-items:center}
+.opt .thumb{width:104px;height:104px;border-radius:12px;overflow:hidden;position:relative;flex:none;background:var(--surf)}
+.opt .thumb canvas{position:absolute;inset:0;width:100%;height:100%}
+.opt .tx{flex:1;min-width:0}
+.radio{width:24px;height:24px;border-radius:12px;border:2px solid var(--outline);flex:none;display:flex;align-items:center;justify-content:center}
+.opt[aria-checked=true] .radio{border-color:var(--p);background:var(--p);color:var(--on-p)}
+.opt[aria-checked=true] .radio svg{width:16px;height:16px;stroke-width:3}
+.opt .radio svg{display:none}.opt[aria-checked=true] .radio svg{display:block}
+.rec{display:inline-block;padding:1px 8px;border-radius:8px;background:var(--p);color:var(--on-p);font-size:11px;font-weight:500;margin-left:6px;vertical-align:2px}
+.banner{display:flex;gap:10px;padding:12px 14px;border-radius:14px;background:var(--warn);color:var(--on-warn);align-items:flex-start}
+.banner.err{background:var(--errc);color:var(--on-errc)}
+.sysdlg{background:#f1f1f1;color:#111;margin:0 28px;border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:12px;width:100%}
+.sysdlg .mock{font-size:11px;letter-spacing:.04em;text-transform:uppercase;opacity:.55}
+.sysdlg .choice{display:flex;flex-direction:column;gap:8px}
+.sysdlg .choice button{min-height:48px;padding:0 18px;border-radius:24px;font-weight:500;color:#1a56b0;background:#e4eaf6;text-align:left}
+.dim{position:absolute;inset:0;background:var(--scrim);z-index:20;display:flex;align-items:flex-end}
+.dim.center{align-items:center;justify-content:center}
+.picker{background:#f1f1f1;color:#111;width:100%;height:100%;display:flex;flex-direction:column;position:absolute;inset:0;z-index:25}
+.picker .bar{padding:14px 16px;font-weight:500;font-size:18px;border-bottom:1px solid #ccc}
+.picker .li{display:flex;gap:12px;padding:14px 16px;align-items:center;border-bottom:1px solid #ddd;text-align:left;width:100%;min-height:56px}
+.picker .use{margin:12px;min-height:52px;border-radius:26px;background:#1a56b0;color:#fff;font-weight:500}
+.bsheet{background:var(--bg);color:var(--on);width:100%;border-radius:28px 28px 0 0;padding:24px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.fresh{animation:rise .35s var(--ease)}@keyframes rise{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<aside id="panel" aria-label="Prototype controls">
+  <h2>Prototype controls, not part of the app</h2>
+  <h3>Jump to a screen</h3><div class="row" id="presets"></div>
+  <h3>What the person does</h3>
+  <label>Photos access answer
+    <select data-opt="perm"><option value="full">Allow all (full access)</option><option value="partial">Selected photos only</option><option value="denied">Don't allow</option></select></label>
+  <label><input type="checkbox" data-opt="plugged"> Archive Drive is plugged in</label>
+  <label><input type="checkbox" data-opt="empty"> Phone has no photos (use bundled sample)</label>
+  <h3>Options</h3>
+  <label><input type="checkbox" data-opt="build1"> Build 1: Free up space hidden</label>
+  <label><input type="checkbox" data-opt="big"> Large text (130%)</label>
+  <label><input type="checkbox" data-opt="dark"> Dark theme</label>
+  <h3>State</h3><pre id="dump"></pre>
+  <p class="note">Library assumed: 600 GB, 48,000 items. Preview sizes are plausible guesses, not measured (the on-device spike measures them).</p>
+</aside>
+<div id="stage"><div id="phone"><div id="screen"></div></div></div>
+
+<script>
+/* ---------- data ---------- */
+const LIB={count:48000,gb:600};
+const PRESETS=[
+  {k:'smaller',name:'Smaller',edge:540,q:60,kb:58,line:'Fits the most. Fine for finding a photo, soft when you zoom.',pix:.42,blur:.7},
+  {k:'balanced',name:'Balanced',edge:720,q:70,kb:112,line:'Looks good on the phone screen. Our pick for most people.',pix:.62,blur:.4,rec:true},
+  {k:'sharper',name:'Sharper',edge:1080,q:75,kb:265,line:'Crisp even when you zoom in. Takes more room.',pix:1,blur:0},
+];
+const PALS=[['#F6C177','#EB8F5A','#2F5D62','#1D3B3F'],['#BFE3F5','#8CC4E8','#4C8C5B','#2E5E3B'],['#2B3A67','#6D5C9C','#E07A5F','#1B1F3B'],['#F4E3C1','#E0B88B','#8A6F5A','#5C4636']];
+const PHOTOS=[{name:'IMG_20261004_181233.jpg',pal:0,mb:4.1,what:'Sunset over hills'},{name:'IMG_20261002_093012.jpg',pal:1,mb:3.6,what:'Garden'},{name:'IMG_20260928_201544.jpg',pal:2,mb:5.2,what:'Evening sky'},{name:'IMG_20260921_120201.jpg',pal:3,mb:2.9,what:'Table'}];
+const BUNDLED={name:'Sample photo (built into the app)',pal:1,mb:3.8,what:'Sample'};
+function svgFor(pal,w=300){const p=PALS[pal];return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${w}" height="${w}"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p[0]}"/><stop offset="1" stop-color="${p[1]}"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/><circle cx="68" cy="26" r="10" fill="#fff" opacity=".85"/><path d="M0 62 Q 25 40 50 55 T 100 48 V100 H0Z" fill="${p[2]}"/><path d="M0 78 Q 30 66 55 74 T 100 70 V100 H0Z" fill="${p[3]}"/><g stroke="${p[3]}" stroke-width=".6" fill="none" opacity=".7"><path d="M10 60l3-6 3 6M20 62l3-7 3 7M30 58l2-5 2 5"/></g><text x="8" y="94" font-size="5" fill="#fff" opacity=".9" font-family="sans-serif">fine detail 1234</text></svg>`}
+const imgCache={};
+function loadImg(pal){return imgCache[pal]||(imgCache[pal]=new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.src='data:image/svg+xml;utf8,'+encodeURIComponent(svgFor(pal))}))}
+async function paint(canvas,pal,preset){ // simulate quality by drawing small then scaling up
+  const img=await loadImg(pal),S=240,s=Math.max(24,Math.round(S*preset.pix));
+  canvas.width=S;canvas.height=S;const c=canvas.getContext('2d');
+  const t=document.createElement('canvas');t.width=s;t.height=s;t.getContext('2d').drawImage(img,0,0,s,s);
+  c.imageSmoothingEnabled=true;if(preset.blur)c.filter=`blur(${preset.blur}px)`;c.drawImage(t,0,0,S,S);
+}
+const P={
+ drive:'<rect x="3" y="12" width="18" height="8" rx="2"/><path d="M5 12l2-7h10l2 7"/><path d="M16.5 16h.01" stroke-width="3"/>',
+ check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',photos:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M3 17l5-5 4 4 3-3 6 6"/>',
+ back:'<path d="M15 5l-7 7 7 7"/>',close:'<path d="M6 6l12 12M18 6L6 18"/>',alert:'<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.01"/>',
+ shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
+ swap:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',plug:'<path d="M9 3v5M15 3v5M6 8h12v4a6 6 0 0 1-12 0zM12 18v3"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>'};
+const ic=(n,c='')=>`<svg class="ic ${c}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+
+/* ---------- state ---------- */
+const S={screen:'welcome',perm:'full',plugged:false,empty:false,build1:true,big:false,dark:false,
+  quality:'balanced',photoIdx:0,sheet:null,syspermission:false,picker:false,driveOk:false,permGranted:false,fromFree:false};
+const photo=()=>S.empty?BUNDLED:PHOTOS[S.photoIdx%PHOTOS.length];
+const q=k=>PRESETS.find(p=>p.k===k);
+const totalGB=p=>{const g=p.kb*LIB.count/1048576;return (g<10?g.toFixed(1):Math.round(g))+' GB'};
+const kbShow=(p)=>{const f=photo().mb/4;return Math.round(p.kb*f)+' KB'};
+const el=document.getElementById('screen');
+function go(s){S.screen=s;S.sheet=null;S.picker=false;S.syspermission=false;render()}
+
+/* ---------- screens ---------- */
+function dots(n){return `<div class="dots" aria-label="Step ${n} of 4">${[1,2,3,4].map(i=>`<i class="${i===n?'on':''}"></i>`).join('')}</div>`}
+function shell(inner,foot,back){return `<div class="sb"><span>9:41</span><span>5G ▮</span></div>${back?`<div class="appbar"><button class="iconbtn" data-a="${back}" aria-label="Back">${ic('back')}</button></div>`:''}<div class="scroll">${inner}</div>${foot?`<div class="foot">${foot}</div>`:''}<div class="gesture"><b></b></div>`}
+
+function welcome(){return shell(`<div class="pad stack fresh">
+  <div class="hero">${ic('photos')}</div>
+  <h1 class="hs" style="text-align:center">Keep every photo.<br>Free up your phone.</h1>
+  <p class="bl var" style="text-align:center">Photoxpo copies your photos and videos to your Archive Drive, the USB drive you plug into your phone. Then it keeps a small <b>Preview</b> of each one on your phone, so you can still look at everything.</p>
+  <div class="card stack" style="gap:12px">
+    <div class="row3">${ic('shield')}<p class="bm"><b>Nothing is lost.</b> Your full-quality photos stay safe on your drive. We check every copy before calling it Backed up.</p></div>
+    <div class="row3">${ic('photos')}<p class="bm"><b>Need the full photo?</b> Tap Load and it comes back from your drive.</p></div>
+  </div></div>`,`<button class="btn" data-a="to:perm">Get started</button><span class="lm var">Takes about 2 minutes. No account needed.</span>`)}
+
+function permScreen(){
+  const d=S.perm==='denied',pt=S.perm==='partial'&&S.permGranted;
+  let msg='';
+  if(S.permGranted&&S.perm==='denied')msg=`<div class="banner err">${ic('alert')}<div class="bm"><b>Photoxpo can't see your photos yet.</b> Without this it can't back anything up. You can change this in Settings.</div></div>`;
+  if(pt)msg=`<div class="banner">${ic('alert')}<div class="bm"><b>Only some photos are shared.</b> Photoxpo would back up just those. To back up everything, choose “Allow all”.</div></div>`;
+  const ok=S.permGranted&&S.perm==='full';
+  const foot=ok?`<button class="btn" data-a="to:drive">Continue</button>`
+    : S.permGranted&&S.perm==='denied'?`<button class="btn" data-a="openset">Open Settings</button><button class="btn text" data-a="askperm">Try again</button>`
+    : S.permGranted&&pt?`<button class="btn" data-a="openset">Allow all in Settings</button><button class="btn text" data-a="to:drive">Continue with only these photos</button>`
+    :`<button class="btn" data-a="askperm">Allow access to photos</button>`;
+  return shell(`<div class="pad stack fresh">${dots(1)}
+   <h1 class="hs">Let Photoxpo see your photos</h1>
+   <p class="bl var">To back up your camera photos and videos, Photoxpo needs to look at them. It only reads them. It never changes or deletes anything.</p>
+   <div class="card stack" style="gap:12px"><div class="row3">${ic('check')}<p class="bm">On the next screen, choose <b>“Allow all”</b>.</p></div>
+   <div class="row3">${ic('info')}<p class="bm var">“Select photos” would back up only the ones you pick by hand.</p></div></div>
+   ${msg}${ok?`<div class="banner" style="background:var(--pc);color:var(--on-pc)">${ic('check')}<div class="bm"><b>Photoxpo can see your photos.</b></div></div>`:''}
+  </div>`,foot,'to:welcome')}
+
+function driveScreen(){
+  const found=S.driveOk;
+  let body;
+  if(found)body=`<div class="banner" style="background:var(--pc);color:var(--on-pc)">${ic('drive')}<div class="bm"><b>Archive Drive ready.</b><br>Seagate Portable, 1.8 TB free. Your photos will go in a folder called <b>Photoxpo</b>.</div></div>`;
+  else if(!S.plugged)body=`<div class="banner">${ic('plug')}<div class="bm"><b>Plug in your drive first.</b><br>Connect the USB drive to your phone with its cable or adapter. Then tap Choose drive.</div></div><p class="bm var">No drive handy? You can skip this and add it later. Photoxpo just won't back anything up until you do.</p>`;
+  else body=`<p class="bm var">Your phone will show a file picker. Open your drive, then tap <b>Use this folder</b>. You only do this once.</p>`;
+  const foot=found?`<button class="btn" data-a="to:quality">Continue</button>`
+    :`<button class="btn" data-a="pick">Choose drive</button><button class="btn text" data-a="skipdrive">Do this later</button>`;
+  return shell(`<div class="pad stack fresh">${dots(2)}
+   <div class="hero" style="margin:0 auto">${ic('drive')}</div>
+   <h1 class="hs">Choose your Archive Drive</h1>
+   <p class="bl var">This is where your full-quality photos and videos will live.</p>${body}</div>`,foot,'to:perm')}
+
+function pairHtml(){return ``}
+function qualityBody(inFree){
+  const ph=photo();
+  const opts=PRESETS.map(p=>`<button class="opt" role="radio" aria-checked="${S.quality===p.k}" data-a="q:${p.k}">
+    <div class="top"><div class="thumb"><canvas data-p="${p.k}"></canvas></div>
+    <div class="tx"><div class="tm">${p.name}${p.rec?'<span class="rec">Recommended</span>':''}</div>
+      <div class="bm var">${p.line}</div></div><span class="radio">${ic('check')}</span></div>
+    <div class="bm" style="display:flex;justify-content:space-between;padding:0 4px"><span>This photo: <b>${kbShow(p)}</b></span><span>All your photos: <b>${totalGB(p)}</b></span></div>
+  </button>`).join('');
+  return `<p class="bl var">${inFree?'Choose how your Previews look. A Preview is what stays on your phone.':'A Preview is the small copy that stays on your phone. Pick how good it should look.'}</p>
+  <div class="card" style="padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between"><div class="bm"><div class="tm" style="margin-bottom:2px">${S.empty?'Sample photo':'Your photo'}</div><span class="var">${S.empty?'No photos on this phone yet':ph.what+' · '+ph.mb+' MB original'}</span></div>
+   ${S.empty?'':`<button class="btn tonal sm" style="min-height:44px;width:auto;padding:0 16px;font-size:14px" data-a="another">${ic('swap')}Try another</button>`}</div>
+  <div class="stack" role="radiogroup" aria-label="Preview quality" style="gap:12px">${opts}</div>
+  <div class="card bm" style="display:flex;gap:10px">${ic('drive')}<div>Your full-quality original is always kept on your drive. Previews are only what you see on the phone. <b>You can change this later</b>${inFree?'':' in Settings'}.</div></div>`}
+
+function qualityScreen(){
+  return shell(`<div class="pad stack fresh">${dots(3)}<h1 class="hs">How should your Previews look?</h1>${qualityBody(false)}</div>`,
+   `<button class="btn" data-a="to:ready">Use ${q(S.quality).name}</button>`,'to:drive')}
+
+function readyScreen(){
+  const driveLine=S.driveOk?'Your drive is connected.':'No drive yet: you can connect it any time.';
+  return shell(`<div class="pad stack fresh">${dots(4)}
+   <div class="hero">${ic('check')}</div><h1 class="hs" style="text-align:center">You're ready</h1>
+   <p class="bl var" style="text-align:center">${driveLine}</p>
+   <div class="card stack" style="gap:10px"><div class="bm"><b>Photos:</b> ${S.perm==='full'||!S.permGranted?'All photos':'Selected photos only'}</div>
+   <div class="bm"><b>Archive Drive:</b> ${S.driveOk?'Seagate Portable':'Not chosen yet'}</div>
+   <div class="bm"><b>Previews:</b> ${q(S.quality).name} (about ${totalGB(q(S.quality))} on your phone)</div></div>
+   <p class="bm var" style="text-align:center">The first backup of 600 GB can take many hours. Keep the phone plugged in; you can pause any time.</p></div>`,
+   `<button class="btn" data-a="finish">${S.driveOk?'Start first backup':'Go to Home'}</button>`)}
+
+function homeStub(){return shell(`<div class="pad stack"><h1 class="hs">Home</h1><p class="bl var">(Home is the previous prototype. Onboarding ends here.)</p>
+  ${S.build1?'':`<button class="btn tonal" data-a="free">Free up space</button>`}
+  <p class="bm var">Preview quality: <b>${q(S.quality).name}</b></p></div>`,'')}
+
+function freeScreen(){
+  return shell(`<div class="pad stack fresh"><h1 class="hs">Free up space</h1>
+  <p class="bm var">Before freeing space, check the Preview quality you want to keep on your phone. Previews are never removed.</p>${qualityBody(true)}</div>`,
+  `<button class="btn" data-a="freecont">Continue with ${q(S.quality).name}</button><span class="lm var">(Next: choose how much to free. Not in this prototype.)</span>`,'to:home')}
+
+function overlays(){
+  let o='';
+  if(S.syspermission)o+=`<div class="dim center"><div class="sysdlg" role="dialog"><span class="mock">Android system dialog (mocked)</span><p style="font-size:17px"><b>Allow Photoxpo to access photos and videos on this device?</b></p>
+   <div class="choice"><button data-a="perm:full">Allow all</button><button data-a="perm:partial">Select photos and videos</button><button data-a="perm:denied">Don't allow</button></div></div></div>`;
+  if(S.picker)o+=`<div class="picker" role="dialog"><span style="font-size:11px;padding:6px 16px;opacity:.55;text-transform:uppercase">Android folder picker (mocked)</span><div class="bar">${S.plugged?'Choose a folder':'Choose a folder'}</div>
+   <button class="li" data-a="noop"><span>📱</span><span>Phone</span></button>
+   ${S.plugged?`<button class="li" data-a="noop"><span>💽</span><span>Seagate Portable<br><small>1.8 TB free</small></span></button>`:`<div class="li" style="opacity:.6">No USB drive found. Plug it in and reopen this picker.</div>`}
+   <div style="flex:1"></div>${S.plugged?`<button class="use" data-a="usefolder">Use this folder</button>`:''}<button class="use" style="background:#ddd;color:#111;margin-top:0" data-a="closepicker">Cancel</button></div>`;
+  return o;
+}
+function render(){
+  document.body.dataset.theme=S.dark?'dark':'light';document.documentElement.style.setProperty('--fs',S.big?1.3:1);
+  const m={welcome,perm:permScreen,drive:driveScreen,quality:qualityScreen,ready:readyScreen,home:homeStub,free:freeScreen};
+  el.innerHTML=m[S.screen]()+overlays();
+  el.querySelectorAll('canvas[data-p]').forEach(c=>paint(c,photo().pal,q(c.dataset.p)));
+  panel();
+}
+const SCREENS=[['welcome','1 Welcome'],['perm','2 Photos access'],['drive','3 Archive Drive'],['quality','4 Preview quality'],['ready','5 Ready'],['free','Free up space (chooser again)']];
+function panel(){
+  document.getElementById('presets').innerHTML=SCREENS.map(([k,n])=>`<button class="pre" aria-pressed="${S.screen===k}" data-jump="${k}">${n}</button>`).join('');
+  document.getElementById('dump').textContent=JSON.stringify({screen:S.screen,perm:S.perm,permAnswered:S.permGranted,plugged:S.plugged,driveChosen:S.driveOk,quality:S.quality,photo:photo().name},null,1);
+  document.querySelectorAll('[data-opt]').forEach(i=>{const k=i.dataset.opt;if(i.type==='checkbox')i.checked=S[k];else i.value=S[k]});
+}
+document.addEventListener('click',e=>{
+  const j=e.target.closest('[data-jump]');if(j){S.screen=j.dataset.jump;if(S.screen==='free')S.build1=false;S.sheet=null;S.picker=false;S.syspermission=false;render();return}
+  const b=e.target.closest('[data-a]');if(!b)return;const [a,v]=b.dataset.a.split(':');
+  if(a==='to')return go(v);
+  if(a==='askperm'){S.syspermission=true;return render()}
+  if(a==='perm'){S.perm=v;S.permGranted=true;S.syspermission=false;return render()}
+  if(a==='openset'){S.perm='full';S.permGranted=true;return render()}
+  if(a==='pick'){S.picker=true;return render()}
+  if(a==='closepicker'){S.picker=false;return render()}
+  if(a==='usefolder'){S.driveOk=true;S.picker=false;return render()}
+  if(a==='skipdrive'){S.driveOk=false;return go('quality')}
+  if(a==='q'){S.quality=v;return render()}
+  if(a==='another'){S.photoIdx++;return render()}
+  if(a==='finish')return go('home');
+  if(a==='free')return go('free');
+  if(a==='freecont'){return go('home')}
+});
+document.addEventListener('change',e=>{const k=e.target.dataset.opt;if(!k)return;S[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;render()});
+render();
+</script>
+</body>
+</html>
