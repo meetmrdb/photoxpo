@@ -157,7 +157,7 @@ class BackupResumeTest {
     }
 
     @Test
-    fun unprovenFinalWithDifferentBytes_isMovedAsideAndOriginalIsCopied() {
+    fun unprovenFinalWithDifferentBytes_staysInPlaceAndOriginalGetsShortHash() {
         val root = folders.newFolder("mismatch").toPath()
         val samples = samples().take(2)
         val wrong = byteArrayOf(42, 42, 42, 42)
@@ -165,20 +165,24 @@ class BackupResumeTest {
         val drive = FakeArchiveDrive(root)
         val result = startBackupRun(media(samples), drive, clock = fixedClock())
 
+        val versionPath = "Photoxpo/Originals/2020/2020-01/IMG_0001-66840dda.jpg"
         assertEquals(2, drive.writeCalls)
         assertTrue(result.items.all { it.state == ItemState.COMMITTED })
-        assertArrayEquals(samples[0].bytes, Files.readAllBytes(root.resolve(samples[0].drivePath)))
+        assertArrayEquals(wrong, Files.readAllBytes(root.resolve(samples[0].drivePath)))
+        assertArrayEquals(samples[0].bytes, Files.readAllBytes(root.resolve(versionPath)))
         assertArrayEquals(samples[1].bytes, Files.readAllBytes(root.resolve(samples[1].drivePath)))
-        val aside = samples[0].drivePath + ".photoxpo-unproven-1"
-        assertTrue(drive.exists(aside))
-        assertArrayEquals(wrong, Files.readAllBytes(root.resolve(aside)))
+        assertFalse(drive.exists(samples[0].drivePath + ".photoxpo-unproven-1"))
         assertNoPartFiles(root)
 
         val entries = ManifestReader().readAll(drive).flatMap { it.entries }
-        assertEquals(samples.map { it.drivePath }.sorted(), entries.map { it.drivePath }.sorted())
-        val adopted = entries.single { it.drivePath == samples[0].drivePath }
-        assertEquals(sha256(samples[0].bytes), adopted.hash)
-        assertEquals(samples[0].file.sizeBytes, adopted.size)
+        assertEquals(
+            listOf(versionPath, samples[1].drivePath).sorted(),
+            entries.map { it.drivePath }.sorted(),
+        )
+        val stored = entries.single { it.drivePath == versionPath }
+        assertEquals(sha256(samples[0].bytes), stored.hash)
+        assertEquals(samples[0].file.sizeBytes, stored.size)
+        assertEquals(samples[0].file.name, stored.originalFilename)
     }
 
     @Test
