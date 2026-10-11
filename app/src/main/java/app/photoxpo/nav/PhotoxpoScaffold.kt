@@ -8,7 +8,6 @@ import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -16,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import app.photoxpo.onboarding.OnboardingRoute
 import app.photoxpo.photos.PhotoRoute
 import app.photoxpo.photos.PhotosRoute
 import app.photoxpo.photos.PhotosRepository
@@ -24,16 +24,20 @@ import app.photoxpo.photos.PreviewBitmapCache
 @Composable
 fun PhotoxpoScaffold(
     repository: PhotosRepository,
+    startOnboarding: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val navController = rememberNavController()
     val previewCache = remember { PreviewBitmapCache() }
     val route = navController.currentBackStackEntryAsState().value?.destination?.route
-    val showBottomBar = route == null || route == AppRoutes.Home || route == AppRoutes.Photos
+    val onboardingVisible = route == AppRoutes.Onboarding || (route == null && startOnboarding)
+    val showBottomBar = !onboardingVisible && (
+        route == null || route == AppRoutes.Home || route == AppRoutes.Photos
+        )
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        contentWindowInsets = if (showBottomBar) {
+        contentWindowInsets = if (showBottomBar || onboardingVisible) {
             ScaffoldDefaults.contentWindowInsets
         } else {
             WindowInsets(0, 0, 0, 0)
@@ -50,9 +54,20 @@ fun PhotoxpoScaffold(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = AppRoutes.Home,
+            startDestination = if (startOnboarding) AppRoutes.Onboarding else AppRoutes.Home,
             modifier = Modifier.fillMaxSize(),
         ) {
+            composable(AppRoutes.Onboarding) {
+                OnboardingRoute(
+                    onFinished = {
+                        navController.navigate(AppRoutes.Home) {
+                            popUpTo(AppRoutes.Onboarding) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    },
+                    modifier = Modifier.padding(innerPadding),
+                )
+            }
             composable(AppRoutes.Home) {
                 HomeRoute(modifier = Modifier.padding(innerPadding))
             }
@@ -85,7 +100,7 @@ fun PhotoxpoScaffold(
 
 private fun NavHostController.openTab(route: String) {
     navigate(route) {
-        popUpTo(graph.findStartDestination().id) {
+        popUpTo(AppRoutes.Home) {
             saveState = true
         }
         launchSingleTop = true

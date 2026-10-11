@@ -1,4 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Photoxpo</string>
+    <string name="onboarding_step">Step %1$d of %2$d</string>
+    <string name="onboarding_back">Back</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_welcome_sentence">Photoxpo copies your photos and videos to your Archive Drive and keeps a small Preview of each one on your phone.</string>
+    <string name="onboarding_get_started">Get started</string>
+    <string name="onboarding_photos_title">Let Photoxpo see your photos</string>
+    <string name="onboarding_photos_body">Photoxpo needs to see your camera photos and videos so it can back them up. It only reads them. It never changes or deletes anything.</string>
+    <string name="onboarding_photos_allow_all">On the next screen, choose Allow all.</string>
+    <string name="onboarding_photos_select_warning">If you select photos, the rest will not be Backed up.</string>
+    <string name="onboarding_photos_allow">Allow access to photos</string>
+    <string name="onboarding_photos_seen">Photoxpo can see your photos.</string>
+    <string name="onboarding_open_settings">Open Settings</string>
+    <string name="onboarding_try_again">Try again</string>
+    <string name="onboarding_drive_title">Choose your Archive Drive</string>
+    <string name="onboarding_drive_body">Plug in your Archive Drive first. Then choose its folder. This is where your Originals will live.</string>
+    <string name="onboarding_drive_choose">Choose Archive Drive</string>
+    <string name="onboarding_drive_choose_again">Choose again</string>
+    <string name="onboarding_drive_later">Do this later</string>
+    <string name="onboarding_drive_later_note">Nothing is Backed up until you choose an Archive Drive.</string>
+    <string name="onboarding_drive_ready">Archive Drive ready. Your Originals will go in a folder called Photoxpo.</string>
+    <string name="onboarding_quality_title">How should your Previews look?</string>
+    <string name="onboarding_quality_body">A Preview is the small copy that stays on your phone. Your Original stays on the Archive Drive.</string>
+    <string name="onboarding_your_photo">Your photo</string>
+    <string name="onboarding_sample_photo">Sample photo</string>
+    <string name="onboarding_no_photos">No photos on this phone yet.</string>
+    <string name="onboarding_try_another">Try another photo</string>
+    <string name="onboarding_recommended">Recommended</string>
+    <string name="onboarding_selected">Selected</string>
+    <string name="onboarding_ready_title">You are ready</string>
 </resources>
