@@ -80,8 +80,6 @@ class OriginalLoader(
             }
         } catch (_: DriveUnavailableException) {
             LoadResult.DriveGone
-        } catch (_: FileNotFoundException) {
-            if (handle == null) LoadResult.NotOnDrive else LoadResult.Failed
         } catch (_: Exception) {
             LoadResult.Failed
         } finally {
@@ -91,8 +89,11 @@ class OriginalLoader(
     }
 
     private fun onDrive(path: String, expectedSize: Long): Boolean {
-        if (!archiveDrive.exists(path)) return false
-        return archiveDrive.byteCount(path) == expectedSize
+        return try {
+            archiveDrive.exists(path) && archiveDrive.byteCount(path) == expectedSize
+        } catch (_: FileNotFoundException) {
+            false
+        }
     }
 
     private fun abort(handle: LoadedFileHandle?) {

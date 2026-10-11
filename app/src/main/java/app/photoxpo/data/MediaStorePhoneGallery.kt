@@ -49,7 +49,10 @@ class MediaStorePhoneGallery(
             resolver.openOutputStream(uri)
                 ?: throw IOException("Could not write a Loaded Original")
         } catch (error: Exception) {
-            resolver.delete(uri, null, null)
+            try {
+                resolver.delete(uri, null, null)
+            } catch (_: Exception) {
+            }
             throw error
         }
         return PendingLoadedFile(resolver, uri, output)
@@ -87,7 +90,7 @@ private class PendingLoadedFile(
             } catch (error: Exception) {
                 finished = true
                 closeQuietly()
-                resolver.delete(uri, null, null)
+                deletePending()
                 throw error
             }
         }
@@ -98,7 +101,14 @@ private class PendingLoadedFile(
             if (finished) return
             finished = true
             closeQuietly()
+            deletePending()
+        }
+    }
+
+    private fun deletePending() {
+        try {
             resolver.delete(uri, null, null)
+        } catch (_: Exception) {
         }
     }
 

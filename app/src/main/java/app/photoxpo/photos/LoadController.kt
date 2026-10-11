@@ -42,7 +42,7 @@ class LoadController(
     fun load(photo: PhotoEntity) {
         if (job?.isActive == true) return
         if (photo.originalOnPhone || state.value is LoadUiState.Loaded) return
-        if (!repository.driveOnline.value) {
+        if (!repository.driveOnline.value && state.value !is LoadUiState.Failed) {
             _state.value = LoadUiState.Disabled(LOAD_NEEDS_DRIVE)
             return
         }
