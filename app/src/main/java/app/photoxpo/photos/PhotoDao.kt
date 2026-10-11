@@ -26,6 +26,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE hash IN (:hashes)")
     suspend fun getByHashes(hashes: List<String>): List<PhotoEntity>
 
+    @Query("UPDATE photos SET mediaId = :mediaId, previewFile = :previewFile WHERE hash = :hash")
+    suspend fun linkPhone(hash: String, mediaId: Long?, previewFile: String?)
+
     @Upsert
     suspend fun upsert(photos: List<PhotoEntity>)
 }

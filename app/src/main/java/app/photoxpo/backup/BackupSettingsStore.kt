@@ -90,6 +90,11 @@ class BackupSettingsStore(
         ledger.edit().clear().commit()
     }
 
+    /** Backed up Originals this phone knows about: MediaStore id to SHA-256. The drive wins; this is a cache. */
+    fun ledgerEntries(): Map<String, String> {
+        return ledger.all.mapNotNull { (mediaId, hash) -> (hash as? String)?.let { mediaId to it } }.toMap()
+    }
+
     private companion object {
         const val SETTINGS_PREFS = "photoxpo.backup"
         const val LEDGER_PREFS = "photoxpo.backed-up"
