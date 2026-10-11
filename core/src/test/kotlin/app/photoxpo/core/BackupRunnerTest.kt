@@ -88,6 +88,30 @@ class BackupRunnerTest {
     }
 
     @Test
+    fun photoExifDate_choosesOriginalFolder_notModifiedTime() {
+        val drive = drive()
+        val file = MediaFile(
+            id = "media-exif",
+            name = "IMG_exif.jpg",
+            sizeBytes = ORIGINAL_BYTES.size.toLong(),
+            modifiedAtEpochMillis = Instant.parse("2020-01-01T00:00:00Z").toEpochMilli(),
+            kind = MediaKind.PHOTO,
+            exifDateTimeOriginal = "2021:12:31 23:59:59",
+        )
+        val exifFinalPath = "Photoxpo/Originals/2021/2021-12/IMG_exif.jpg"
+        val result = startBackupRun(FakeMediaSource(listOf(file to ORIGINAL_BYTES)), drive, clock = fixedClock)
+
+        val item = result.items.single()
+        assertEquals(ItemState.COMMITTED, item.state)
+        assertTrue(drive.exists(exifFinalPath))
+        val lines = manifestLines(drive, result.manifestPath)
+        val fileLine = lines[1]
+        assertEquals("2021-12-31", field(fileLine, "chosenDate"))
+        assertEquals("exif", field(fileLine, "sourceTag"))
+        assertEquals(exifFinalPath, field(fileLine, "drivePath"))
+    }
+
+    @Test
     fun byteCountMismatch_needsAttention() {
         val drive = drive(wrongByteCount = true)
         val result = startBackupRun(media(), drive, clock = fixedClock)
