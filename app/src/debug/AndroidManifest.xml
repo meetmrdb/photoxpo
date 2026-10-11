@@ -12,5 +12,10 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
+        <!-- Debug-only seed hook. Starts fake photos when the launch intent extra app.photoxpo.seedPhotos is true. -->
+        <provider
+            android:name="app.photoxpo.photos.DebugSeedHooks"
+            android:authorities="app.photoxpo.debug.seed"
+            android:exported="false" />
     </application>
 </manifest>
