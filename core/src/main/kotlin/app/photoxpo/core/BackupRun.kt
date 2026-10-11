@@ -48,6 +48,7 @@ class BackupRunner(
     private val archiveDrive: ArchiveDrive,
     private val chooseDate: DateChooser = DateChooser(::chooseCaptureDate),
     private val clock: Clock = Clock.systemUTC(),
+    private val previewPreset: PreviewPreset? = null,
 ) {
     fun start(): BackupRunResult {
         val startedAt = clock.instant()
@@ -58,7 +59,7 @@ class BackupRunner(
             val committed = ManifestReader().readAll(archiveDrive)
                 .flatMap { it.entries }
                 .toMutableList()
-            archiveDrive.appendText(manifestPath, headerLine(startedAt) + "\n")
+            archiveDrive.appendText(manifestPath, headerLine(startedAt, previewPreset) + "\n")
             val copier = OriginalCopier(
                 mediaSource = mediaSource,
                 archiveDrive = archiveDrive,
@@ -110,8 +111,9 @@ fun startBackupRun(
     archiveDrive: ArchiveDrive,
     chooseDate: DateChooser = DateChooser(::chooseCaptureDate),
     clock: Clock = Clock.systemUTC(),
+    previewPreset: PreviewPreset? = null,
 ): BackupRunResult {
-    return BackupRunner(mediaSource, archiveDrive, chooseDate, clock).start()
+    return BackupRunner(mediaSource, archiveDrive, chooseDate, clock, previewPreset).start()
 }
 
 internal fun originalPath(localDate: String, filename: String): String {
@@ -127,12 +129,15 @@ private fun manifestPath(startedAt: Instant): String {
     return "$BACKUP_RUNS_DIRECTORY/${RUN_FILE_STAMP.format(startedAt)}.jsonl"
 }
 
-private fun headerLine(startedAt: Instant): String {
-    return JsonLine()
+private fun headerLine(startedAt: Instant, previewPreset: PreviewPreset?): String {
+    val line = JsonLine()
         .field("type", "header")
         .field("startedAt", ISO_MILLIS.format(startedAt))
-        .nullField("previewPreset")
-        .build()
+    return if (previewPreset == null) {
+        line.nullField("previewPreset").build()
+    } else {
+        line.field("previewPreset", previewPreset.wireName()).build()
+    }
 }
 
 private fun fileLine(
@@ -150,7 +155,7 @@ private fun fileLine(
         .field("chosenDate", chosen.localDate)
         .field("sourceTag", chosen.sourceTag)
         .field("originalFilename", file.name)
-        .nullField("previewFileName")
+        .field("previewFileName", previewFileName(hash))
         .build()
 }
 
