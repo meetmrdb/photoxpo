@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Photoxpo PROTOTYPE – home, gallery, Load</title>
+<title>Photoxpo PROTOTYPE v2 – home, history, photo view</title>
 <!--
-  PROTOTYPE, THROWAWAY. Answers wayfinder ticket "Prototype the home screen, gallery and Load flow".
-  Question: what should the first screens look and behave like for Nandhu?
-  Three structurally different variants on one phone-shaped page, switched with ?variant=A|B|C (or the bar / arrow keys).
-    A  "One thing at a time": Home tab = one sentence + one button; Photos tab = the grid.
-    B  "Photos first": the grid is home; a slim status strip rides on top.
-    C  "By month": months are the home screen, each says whether it is Backed up.
+  PROTOTYPE, THROWAWAY. Wayfinder ticket "Prototype the home screen, gallery and Load flow", round 2.
+  Round 1 offered three layouts (A / B / C, see git history). Round 2 builds on the user's pick:
+    - Home and Photos from A, plus a "Last backed up" line and a Backup history screen (C's months, plus other groupings).
+    - History is kept on the Archive Drive; the phone shows its last known copy when the drive is out.
+    - Photo view (B-style full-bleed): icon buttons for Share, Info, Load, and Remove from phone.
+      Load swaps the Preview for the Original in place and says it is now on the phone.
   All photos are drawn placeholders. No persistence. Nothing here is product code.
 -->
 <style>
@@ -35,7 +35,7 @@ body[data-theme=dark]{
 }
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
-body{font:14px/1.4 Roboto,"Segoe UI",system-ui,sans-serif;background:#cfd8d7;color:#162020;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;justify-content:center;padding:20px 16px 90px}
+body{font:14px/1.4 Roboto,"Segoe UI",system-ui,sans-serif;background:#cfd8d7;color:#162020;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;justify-content:center;padding:20px 16px 40px}
 body[data-theme=dark]{background:#0a0f0f;color:#dde4e3}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 :focus-visible{outline:3px solid var(--p);outline-offset:2px}
@@ -64,7 +64,6 @@ body[data-theme=dark] #panel{background:#151c1c;color:#dde4e3;border-color:#556}
 .scroll{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--outv) transparent}
 ::selection{background:var(--pc);color:var(--on-pc)}
 
-/* type scale (sp-like via --fs) */
 .hs{font-size:calc(26px*var(--fs));line-height:1.2;font-weight:500;letter-spacing:-.01em;text-wrap:balance}
 .tl{font-size:calc(22px*var(--fs));line-height:1.25;font-weight:500}
 .tm{font-size:calc(16px*var(--fs));line-height:1.4;font-weight:500}
@@ -74,7 +73,6 @@ body[data-theme=dark] #panel{background:#151c1c;color:#dde4e3;border-color:#556}
 .var{color:var(--var)}
 svg.ic{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
-/* buttons */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 24px;border-radius:28px;font-size:calc(16px*var(--fs));font-weight:500;background:var(--p);color:var(--on-p);width:100%;transition:transform .2s var(--ease)}
 .btn:active{transform:scale(.98)}
 .btn.tonal{background:var(--sc);color:var(--on-sc)}
@@ -88,20 +86,19 @@ svg.ic{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .prog{height:8px;border-radius:4px;background:var(--surf-hi);overflow:hidden}
 .prog>i{display:block;height:100%;background:var(--p);border-radius:4px;transition:width .3s linear}
 .seg{display:inline-flex;border:1px solid var(--outline);border-radius:20px;overflow:hidden}
-.seg button{min-height:40px;padding:0 16px;font-size:calc(14px*var(--fs));font-weight:500}
+.seg button{min-height:40px;padding:0 14px;font-size:calc(14px*var(--fs));font-weight:500}
 .seg button[aria-pressed=true]{background:var(--sc);color:var(--on-sc)}
 .appbar{display:flex;align-items:center;gap:8px;min-height:64px;padding:0 8px 0 20px;flex:none}
+.appbar.back{padding-left:4px}
 .appbar .tl{flex:1}
 .iconbtn{width:48px;height:48px;display:inline-flex;align-items:center;justify-content:center;border-radius:24px}
 
-/* nav bar (A) */
 .nav{display:flex;flex:none;background:var(--surf);height:80px;padding-top:12px}
 .nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:calc(12px*var(--fs));font-weight:500;color:var(--var)}
 .nav button span.pill{width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center}
 .nav button[aria-current=page]{color:var(--on)}
 .nav button[aria-current=page] span.pill{background:var(--pc);color:var(--on-pc)}
 
-/* grid + tiles */
 .gh{padding:20px 16px 8px;font-size:calc(14px*var(--fs));font-weight:500;color:var(--var);position:sticky;top:0;background:var(--bg);z-index:2}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:0 3px}
 .tile{position:relative;aspect-ratio:1;overflow:hidden;background:var(--surf);border-radius:2px;display:block;padding:0}
@@ -114,22 +111,15 @@ svg.ic{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .legend .badge{position:static;flex:none}
 .sample{padding:10px 16px 0;color:var(--var)}
 
-/* status panel pieces */
 .card{background:var(--surf);border-radius:20px;padding:20px}
-.card.warn{background:var(--warn);color:var(--on-warn)}
-.card.err{background:var(--errc);color:var(--on-errc)}
 .stack{display:flex;flex-direction:column;gap:16px}
 .pad{padding:8px 20px 24px}
-.strip{margin:0 12px 6px;border-radius:16px;padding:12px 12px 12px 16px;background:var(--pc);color:var(--on-pc);display:flex;flex-direction:column;gap:8px}
-.strip.warn{background:var(--warn);color:var(--on-warn)}
-.strip.err{background:var(--errc);color:var(--on-errc)}
-.strip.idle{background:var(--surf);color:var(--on)}
-.strip .top{display:flex;align-items:center;gap:12px}
-.strip .top>div{flex:1;min-width:0}
-.strip .prog{background:#0002}
-.strip .prog>i{background:currentColor}
+.rowcard{display:flex;align-items:center;gap:14px;text-align:left;width:100%;background:var(--surf);border-radius:20px;padding:14px 16px;min-height:64px}
+.rowcard .tx{flex:1;min-width:0}
+.lastline{display:flex;align-items:center;gap:8px;color:var(--var)}
+.lastline svg{width:20px;height:20px}
 
-/* month rows (C) */
+/* history */
 .mrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 16px;min-height:88px}
 .mrow:active{background:var(--surf)}
 .mrow .strip4{display:flex;gap:2px;width:112px;flex:none;border-radius:10px;overflow:hidden}
@@ -140,49 +130,54 @@ svg.ic{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .mstate.ok{color:var(--p)}
 .mstate.wait{color:var(--on-warn);background:var(--warn);padding:2px 10px 2px 6px;border-radius:10px}
 .mstate.bad{color:var(--on-errc);background:var(--errc);padding:2px 10px 2px 6px;border-radius:10px}
-.drivecard{margin:4px 16px 8px}
-.cap{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--surf-hi);margin:12px 0 8px}
-.cap i{display:block;height:100%}
-.cap i.a{background:var(--p)}.cap i.b{background:var(--warn);outline:1px solid var(--on-warn);outline-offset:-1px}
+.brow{display:flex;gap:14px;padding:14px 20px;align-items:flex-start}
+.brow .dot{width:40px;height:40px;border-radius:20px;background:var(--pc);color:var(--on-pc);display:flex;align-items:center;justify-content:center;flex:none}
+.hnote{margin:4px 16px 8px;padding:12px 14px;border-radius:14px;background:var(--surf);display:flex;gap:10px;align-items:flex-start}
 
-/* viewer */
-.viewer{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column}
+/* photo view */
+.viewer{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;background:#000;color:#fff}
+.viewer .photo{position:absolute;inset:0;overflow:hidden}
+.viewer .photo svg.sc{position:absolute;inset:0;width:100%;height:100%}
+.viewer .photo.pv svg.sc{filter:blur(3px);transform:scale(1.04)}
+.viewer .photo.sharpen svg.sc{animation:sharpen .9s var(--ease)}
+@keyframes sharpen{from{filter:blur(3px);transform:scale(1.04)}to{filter:none;transform:none}}
+.viewer .top{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;align-items:center;padding:6px 8px;background:linear-gradient(#000b,#0000);height:96px;align-items:flex-start}
+.viewer .top .tm{margin:12px 0 0 4px;flex:1}
+.viewer .tag{margin:12px 8px 0 0;height:28px;padding:0 10px;border-radius:14px;background:var(--scrim);display:flex;align-items:center;font-size:12px;font-weight:500}
+.viewer .bottom{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:72px 16px 12px;display:flex;flex-direction:column;gap:12px;background:linear-gradient(#0000,#000c 45%)}
+.viewer .chip{background:var(--scrim);color:#fff;align-self:flex-start}
+.viewer .chip.ok{background:#0b5c63cc}
+.actions{display:flex;justify-content:space-around;gap:4px;padding-bottom:4px}
+.act{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:72px;min-height:80px;font-size:calc(12px*var(--fs));font-weight:500;color:#fff;text-align:center}
+.act .ring{width:56px;height:56px;border-radius:28px;background:#ffffff26;display:flex;align-items:center;justify-content:center;transition:background .2s}
+.act:active .ring{background:#ffffff44}
+.act.main .ring{background:#7BD5DA;color:#003739}
+.act[disabled]{opacity:.5;cursor:default}
+.act[disabled] .ring{background:#ffffff1a;color:#fff}
+.loadcard{border-radius:20px;padding:14px 16px;background:#1d2424ee;color:#eef;display:flex;flex-direction:column;gap:12px}
+.loadcard .prog{background:#ffffff30}.loadcard .prog>i{background:#7BD5DA}
+.loadcard.err{background:var(--errc);color:var(--on-errc)}
+.hint{display:flex;gap:10px;align-items:flex-start}
 .fresh{animation:rise .35s var(--ease)}
 @keyframes rise{from{transform:translateY(18px);opacity:0}to{transform:none;opacity:1}}
-.viewer .photo{position:relative;flex:1;min-height:0;overflow:hidden}
-.viewer .photo svg.sc{position:absolute;inset:0;width:100%;height:100%}
-.viewer.A{background:#0b0f0f;color:#eef}
-.viewer.A .photo{flex:1}
-.viewer.A .sheet{background:var(--bg);color:var(--on);border-radius:28px 28px 0 0;padding:20px 20px 12px;display:flex;flex-direction:column;gap:12px}
-.viewer.A .top{position:absolute;left:4px;top:4px;z-index:2;color:#fff}
-.viewer.A .top .iconbtn{background:var(--scrim)}
-.viewer.B{background:#000;color:#fff}
-.viewer.B .top{position:absolute;left:0;right:0;top:0;z-index:2;display:flex;align-items:center;padding:6px 8px;background:linear-gradient(#000a,#0000)}
-.viewer.B .bottom{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:16px;display:flex;flex-direction:column;gap:12px;background:linear-gradient(#0000,#000b 40%);padding-top:56px}
-.viewer.B .chip{background:var(--scrim);color:#fff;align-self:flex-start}
-.viewer.C{background:var(--bg);color:var(--on)}
-.viewer.C .photo{flex:none;height:380px}
-.viewer.C .top{position:absolute;left:4px;top:4px;z-index:2;color:#fff}
-.viewer.C .top .iconbtn{background:var(--scrim)}
-.viewer.C .info{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px}
-.kv dt{color:var(--var)}
-.loadcard{border-radius:20px;padding:16px;background:var(--surf);color:var(--on);display:flex;flex-direction:column;gap:12px}
-.viewer.B .loadcard{background:#1d2424;color:#eef}
-.viewer.B .btn.tonal{background:#cce8e5;color:#05201e}
-.hint{display:flex;gap:10px;align-items:flex-start}
 
-/* sheet (free up space) + toast */
+/* sheets, dialogs, toast */
 .dim{position:absolute;inset:0;background:var(--scrim);z-index:20;display:flex;align-items:flex-end}
-.bsheet{background:var(--bg);width:100%;border-radius:28px 28px 0 0;padding:24px 20px 20px;display:flex;flex-direction:column;gap:16px}
-.toast{position:absolute;left:12px;right:12px;bottom:16px;z-index:30;background:#2b3333;color:#eef;border-radius:8px;padding:14px 16px;font-size:calc(14px*var(--fs))}
+.dim.center{align-items:center;justify-content:center}
+.bsheet{background:var(--bg);color:var(--on);width:100%;border-radius:28px 28px 0 0;padding:24px 20px 20px;display:flex;flex-direction:column;gap:16px}
+.sysdlg{background:#f1f1f1;color:#111;margin:0 28px;border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:12px;width:100%}
+.sysdlg .mock{font-size:11px;letter-spacing:.04em;text-transform:uppercase;opacity:.55}
+.sysdlg .row2{display:flex;justify-content:flex-end;gap:8px}
+.sysdlg button{min-height:48px;padding:0 18px;border-radius:24px;font-weight:500;color:#1a56b0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 18px}
+.kv dt{color:var(--var)}
+.kv dd{overflow-wrap:anywhere}
+.targets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.targets button{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:80px;font-size:calc(12px*var(--fs));font-weight:500}
+.targets .ring{width:56px;height:56px;border-radius:28px;background:var(--sc);color:var(--on-sc);display:flex;align-items:center;justify-content:center}
+.toast{position:absolute;left:12px;right:12px;bottom:92px;z-index:30;background:#2b3333;color:#eef;border-radius:8px;padding:14px 16px;font-size:calc(14px*var(--fs))}
+body.viewing .toast{bottom:auto;top:96px}
 body[data-theme=dark] .toast{background:#dde4e3;color:#162020}
-
-/* variant switcher */
-#sw{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:99;display:flex;align-items:center;gap:6px;background:#111;color:#fff;border-radius:999px;padding:6px;box-shadow:0 6px 22px #0006}
-#sw button{width:44px;height:44px;border-radius:50%;color:#fff;font-size:20px;line-height:1}
-#sw button:hover{background:#333}
-#sw span{padding:0 10px;min-width:210px;text-align:center;font-weight:500}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -195,32 +190,33 @@ body[data-theme=dark] .toast{background:#dde4e3;color:#162020}
   <h3>Hardware</h3>
   <button class="big" data-act="plug" id="plugbtn"></button>
   <h3>Options</h3>
-  <label><input type="checkbox" data-opt="build1"> Build 1: hide "Free up space"</label>
+  <label><input type="checkbox" data-opt="build1"> Build 1: hide delete actions (Remove from phone, Free up space)</label>
   <label><input type="checkbox" data-opt="failNext"> Next backup: 2 files fail verification</label>
   <label><input type="checkbox" data-opt="big"> Large text (130%)</label>
   <label><input type="checkbox" data-opt="dark"> Dark theme</label>
   <h3>State</h3>
   <pre id="dump"></pre>
-  <p class="note">Photos are drawn placeholders. Grids show a sample of each month; counts are made up (1,204 backed up + 142 new).</p>
+  <p class="note">Photos are drawn placeholders. Grids show a sample of each month; counts are made up (1,204 backed up + 142 new). Tip: tiles with a drive badge have their Original only on the drive; others are on the phone.</p>
 </aside>
 
 <div id="stage"><div id="phone"><div id="screen"></div></div></div>
 
-<div id="sw" role="group" aria-label="Variant switcher">
-  <button data-act="prev" aria-label="Previous variant">&larr;</button>
-  <span id="swl"></span>
-  <button data-act="next" aria-label="Next variant">&rarr;</button>
-</div>
-
 <script>
 /* ============ data ============ */
-const VARIANTS = {A:'One thing at a time', B:'Photos first', C:'By month'};
 const MONTHS = [
-  {k:'2026-10',name:'October 2026',short:'Oct',count:142,idx:9,n:18},
-  {k:'2026-09',name:'September 2026',short:'Sep',count:247,idx:8,n:12},
-  {k:'2026-08',name:'August 2026',short:'Aug',count:405,idx:7,n:12},
-  {k:'2026-07',name:'July 2026',short:'Jul',count:340,idx:6,n:12},
-  {k:'2026-06',name:'June 2026',short:'Jun',count:212,idx:5,n:12},
+  {k:'2026-10',name:'October 2026',idx:9,n:18,count:142},
+  {k:'2026-09',name:'September 2026',idx:8,n:12,count:247},
+  {k:'2026-08',name:'August 2026',idx:7,n:12,count:405},
+  {k:'2026-07',name:'July 2026',idx:6,n:12,count:340},
+  {k:'2026-06',name:'June 2026',idx:5,n:12,count:212},
+];
+const HISTORY0=[
+  {when:'Wed 7 Oct, 8:15 pm',n:98,gb:2.4},
+  {when:'Sat 3 Oct, 7:02 pm',n:131,gb:3.1},
+  {when:'Sun 27 Sep, 9:40 pm',n:212,gb:5.4},
+  {when:'Sun 30 Aug, 6:12 pm',n:247,gb:6.2},
+  {when:'Tue 28 Jul, 8:30 pm',n:340,gb:8.5},
+  {when:'Mon 15 Jun, 7:45 pm',n:176,gb:4.4},
 ];
 const PALS=[['#F6C177','#EB8F5A','#2F5D62','#1D3B3F'],['#BFE3F5','#8CC4E8','#4C8C5B','#2E5E3B'],['#2B3A67','#6D5C9C','#E07A5F','#1B1F3B'],['#F4E3C1','#E0B88B','#8A6F5A','#5C4636'],['#CFE8D5','#9BCBA7','#3D7A66','#245244'],['#FFD6C0','#F4A6A0','#7C6A9B','#4B3F72']];
 function rng(s){return()=>{s=(s*1664525+1013904223)%4294967296;return s/4294967296}}
@@ -231,9 +227,8 @@ function scene(id){
   const sx=15+r()*70,sy=14+r()*26,sr=7+r()*8;
   const h1=48+r()*22,h2=64+r()*18;
   const hill=(y,a)=>`M0 ${y} Q ${20+r()*20} ${y-a} 50 ${y-a/3} T 100 ${y-a/2} V100 H0Z`;
-  const bld=r()>.55?`<rect x="${58+r()*22}" y="${h1-10}" width="${9+r()*6}" height="${14}" fill="${p[3]}" opacity=".85"/>`:'';
-  const svg=`<svg class="sc" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="g${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p[0]}"/><stop offset="1" stop-color="${p[1]}"/></linearGradient></defs><rect width="100" height="100" fill="url(#g${id})"/><circle cx="${sx}" cy="${sy}" r="${sr}" fill="#fff" opacity=".8"/><path d="${hill(h1,16)}" fill="${p[2]}"/>${bld}<path d="${hill(h2,12)}" fill="${p[3]}"/></svg>`;
-  return sceneCache[id]=svg;
+  const bld=r()>.55?`<rect x="${58+r()*22}" y="${h1-10}" width="${9+r()*6}" height="14" fill="${p[3]}" opacity=".85"/>`:'';
+  return sceneCache[id]=`<svg class="sc" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="g${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p[0]}"/><stop offset="1" stop-color="${p[1]}"/></linearGradient></defs><rect width="100" height="100" fill="url(#g${id})"/><circle cx="${sx}" cy="${sy}" r="${sr}" fill="#fff" opacity=".8"/><path d="${hill(h1,16)}" fill="${p[2]}"/>${bld}<path d="${hill(h2,12)}" fill="${p[3]}"/></svg>`;
 }
 const ITEMS=[];
 (function(){
@@ -242,10 +237,12 @@ const ITEMS=[];
     for(let i=0;i<m.n;i++){
       const day=Math.max(1,28-Math.floor(i*(m.n>12?1.4:2.2)));
       const isVid=((id*37)%9)===0;
-      const d=new Date(2026,m.idx,Math.min(day,m.k==='2026-10'?11:28),9+(id%9),(id*13)%60);
+      const d=new Date(2026,m.idx,Math.min(day,m.k==='2026-10'?11:28),9+(id%9),(id*13)%60,(id*29)%60);
+      const p2=n=>String(n).padStart(2,'0');
       ITEMS.push({id:id++,m:m.k,mi:i,date:d,vid:isVid,
+        name:`${isVid?'VID':'IMG'}_${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.${isVid?'mp4':'jpg'}`,
         mb:isVid?Math.round(60+((id*17)%120)):+(3.2+((id*7)%36)/10).toFixed(1),
-        dur:isVid?`0:${String(8+(id%40)).padStart(2,'0')}`:null,
+        dur:isVid?`0:${p2(8+(id%40))}`:null,
         onPhone:m.k==='2026-10'||(m.k==='2026-09'&&i<5)});
     }
   }
@@ -259,7 +256,6 @@ const P={
  drive:'<rect x="3" y="12" width="18" height="8" rx="2"/><path d="M5 12l2-7h10l2 7"/><path d="M16.5 16h.01" stroke-width="3"/>',
  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
  pause:'<path d="M9 6v12M15 6v12"/>',
- play:'<path d="M8 5v14l11-7z" fill="currentColor"/>',
  photos:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M3 17l5-5 4 4 3-3 6 6"/>',
  home:'<path d="M4 11l8-7 8 7v9H4z"/>',
  alert:'<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.5v.01"/>',
@@ -270,17 +266,23 @@ const P={
  plug:'<path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 01-10 0zM12 16v5"/>',
  chev:'<path d="M9 5l7 7-7 7"/>',
  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/>',
+ share:'<circle cx="6" cy="12" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><path d="M8 11l8-4M8 13l8 4"/>',
+ trash:'<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ chat:'<path d="M4 5h16v11H9l-5 4z"/>',
+ mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+ more:'<path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/>',
 };
 const ic=(n,s)=>`<svg class="ic" viewBox="0 0 24 24" ${s?`style="width:${s}px;height:${s}px"`:''} aria-hidden="true">${P[n]}</svg>`;
 
 /* ============ state ============ */
 const TOTAL=1346, BASE=1204;
-const q=new URLSearchParams(location.search);
 const S={
-  variant:['A','B','C'].includes(q.get('variant'))?q.get('variant'):'A',
   drive:'out',phase:'idle',pausedBy:null,newTotal:142,copied:0,failed:0,
-  loads:{},tab:'home',group:'month',month:null,photo:null,sheet:null,toast:null,preset:'out',
-  opts:{build1:true,failNext:false,big:false,dark:false},
+  last:{when:'Wed 7 Oct, 8:15 pm',ago:'4 days ago'},
+  history:HISTORY0.slice(),
+  loads:{},tab:'home',hist:false,histTab:'month',month:null,typeF:null,photo:null,sheet:null,toast:null,preset:'out',
+  opts:{build1:false,failNext:false,big:false,dark:false},
 };
 const PRESETS=[
  ['out','Drive not connected, 142 new waiting'],
@@ -291,32 +293,44 @@ const PRESETS=[
  ['done','All backed up'],
 ];
 function applyPreset(k){
-  S.preset=k;S.sheet=null;S.toast=null;S.loads={};
+  S.preset=k;S.sheet=null;S.toast=null;S.loads={};S.photo=null;
   Object.assign(S,{drive:'in',phase:'idle',pausedBy:null,newTotal:142,copied:0,failed:0});
+  S.history=HISTORY0.slice();S.last={when:'Wed 7 Oct, 8:15 pm',ago:'4 days ago'};
+  ITEMS.forEach(i=>{if(i.m==='2026-10'||(i.m==='2026-09'&&i.mi<5))i.onPhone=true});
   if(k==='out')S.drive='out';
   if(k==='copying'){S.phase='copying';S.copied=48}
   if(k==='pulled'){S.drive='out';S.phase='paused';S.pausedBy='pulled';S.copied=48}
   if(k==='verify'){S.phase='verifyFail';S.copied=140;S.failed=2}
-  if(k==='done'){S.phase='done';S.copied=142}
+  if(k==='done'){S.phase='done';S.copied=142;finishBackup(true)}
   render();
+}
+function finishBackup(silent){
+  S.last={when:'Today, 9:41 am',ago:'just now'};
+  S.history.unshift({when:'Today, 9:41 am',n:S.newTotal,gb:3.6});
 }
 
 /* ============ derived ============ */
 const left=()=>S.newTotal-S.copied-S.failed;
+const onPhone=it=>it.onPhone||(S.loads[it.id]&&S.loads[it.id].s==='done');
+function isBacked(it){
+  if(it.m!=='2026-10')return true;
+  const frac=S.phase==='done'||left()<=0?1:S.copied/S.newTotal;
+  return (17-it.mi)<Math.round(frac*18);
+}
 function status(){
   const drive=S.drive==='in', L=left(), total=S.newTotal;
-  if(S.phase==='copying')return{tone:'busy',title:`Backing up… ${S.copied} of ${total}`,sub:'Keep your drive plugged in.',progress:S.copied/total,pause:true};
+  if(S.phase==='copying')return{title:`Backing up… ${S.copied} of ${total}`,sub:'Keep your drive plugged in.',progress:S.copied/total,pause:true};
   if(S.phase==='paused'){
     const prog=S.copied/total;
-    if(!drive)return{tone:'warn',title:'Your drive was unplugged',sub:`${S.copied} of ${total} are safe on it. Plug it back in to continue.`,progress:prog,primary:{label:'Waiting for your drive',disabled:true}};
-    if(S.pausedBy==='pulled')return{tone:'idle',title:'Your drive is back',sub:`Continue where you left off: ${S.copied} of ${total} are done.`,progress:prog,primary:{label:'Continue',act:'resume'}};
-    return{tone:'idle',title:`Paused at ${S.copied} of ${total}`,sub:'Nothing is lost. Continue when you like.',progress:prog,primary:{label:'Continue',act:'resume'}};
+    if(!drive)return{title:'Your drive was unplugged',sub:`${S.copied} of ${total} are safe on it. Plug it back in to continue.`,progress:prog,primary:{label:'Waiting for your drive',disabled:true,icon:'plug'}};
+    if(S.pausedBy==='pulled')return{title:'Your drive is back',sub:`Continue where you left off: ${S.copied} of ${total} are done.`,progress:prog,primary:{label:'Continue',act:'resume'}};
+    return{title:`Paused at ${S.copied} of ${total}`,sub:'Nothing is lost. Continue when you like.',progress:prog,primary:{label:'Continue',act:'resume'}};
   }
-  if(S.phase==='verifyFail')return{tone:'err',title:`${S.copied} backed up, ${S.failed} need another try`,sub:'Those 2 are still on your phone. Nothing was lost.',primary:{label:'Try again',act:'retry',icon:'refresh'}};
-  if(S.phase==='done'||L<=0)return{tone:'ok',title:`All ${TOTAL.toLocaleString()} photos are backed up`,sub:drive?'Checked just now.':'Plug in your drive after you take more photos.',done:true,free:!S.opts.build1};
+  if(S.phase==='verifyFail')return{title:`${S.copied} backed up, ${S.failed} need another try`,sub:'Those 2 are still on your phone. Nothing was lost.',primary:{label:'Try again',act:'retry',icon:'refresh'}};
+  if(S.phase==='done'||L<=0)return{title:`All ${TOTAL.toLocaleString()} photos are backed up`,sub:drive?'Checked just now.':'Plug in your drive after you take more photos.',done:true,free:!S.opts.build1};
   return drive
-   ?{tone:'idle',title:`${L} new photos to back up`,sub:`3.6 GB · about ${Math.round(L*.28)} minutes`,primary:{label:'Back up now',act:'backup',icon:'drive'}}
-   :{tone:'idle',title:`${L} new photos waiting`,sub:'Plug in your drive to back them up.',primary:{label:'Plug in your drive',disabled:true,icon:'plug'}};
+   ?{title:`${L} new photos to back up`,sub:`3.6 GB · about ${Math.round(L*.28)} minutes`,primary:{label:'Back up now',act:'backup',icon:'drive'}}
+   :{title:`${L} new photos waiting`,sub:'Plug in your drive to back them up.',primary:{label:'Plug in your drive',disabled:true,icon:'plug'}};
 }
 function monthState(m){
   if(m.k!=='2026-10')return{kind:'ok',text:'All backed up'};
@@ -326,23 +340,23 @@ function monthState(m){
   return{kind:'wait',text:`${S.newTotal} not backed up yet`};
 }
 function where(it){
-  if(S.loads[it.id]&&S.loads[it.id].s==='done')return'Original loaded to your phone';
+  const ld=S.loads[it.id];
+  if(ld&&ld.s==='done')return'Original loaded · on this phone and your drive';
   if(!it.onPhone)return'Original is on your drive';
-  const frac=S.phase==='done'||left()<=0?1:S.copied/S.newTotal;
-  const backed=it.m!=='2026-10'||(17-it.mi)<Math.round(frac*18);
-  return backed?'Safe on your drive and on your phone':'Only on your phone so far';
+  return isBacked(it)?'On this phone and safe on your drive':'Only on this phone so far';
 }
 
 /* ============ small renderers ============ */
-const primaryBtn=(p,cls='')=>p?`<button class="btn ${cls}" ${p.disabled?'disabled':`data-act="${p.act}"`}>${p.icon?ic(p.icon):''}${p.label}</button>`:'';
+const primaryBtn=p=>p?`<button class="btn" ${p.disabled?'disabled':`data-act="${p.act}"`}>${p.icon?ic(p.icon):''}${p.label}</button>`:'';
 const prog=f=>`<div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(f*100)}"><i style="width:${Math.round(f*100)}%"></i></div>`;
 const driveChip=()=>S.drive==='in'
   ?`<span class="chip ok">${ic('drive',20)}Drive connected</span>`
   :`<span class="chip">${ic('plug',20)}Drive not connected</span>`;
 function tile(it){
-  const off=!it.onPhone&&!(S.loads[it.id]&&S.loads[it.id].s==='done');
+  const off=!onPhone(it);
   return `<button class="tile" data-act="photo" data-id="${it.id}" aria-label="${it.vid?'Video':'Photo'}, ${fmtDay(it.date)}${off?', Original is on your drive':''}">${scene(it.id)}${it.vid?`<span class="vid"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>${it.dur}</span>`:''}${off?`<span class="badge" aria-hidden="true">${ic('drive')}</span>`:''}</button>`;
 }
+const legend=()=>`<div class="legend lm"><span class="badge">${ic('drive')}</span><span>Original is on your drive. Tap a photo to see it or Load it.</span></div>`;
 function grouped(items,mode){
   const groups=[];
   for(const it of items){
@@ -350,125 +364,154 @@ function grouped(items,mode){
     const g=groups[groups.length-1];
     if(g&&g.key===key)g.items.push(it);else groups.push({key,items:[it]});
   }
-  return groups.map(g=>`<div class="gh">${g.key}</div><div class="grid">${g.items.map(tile).join('')}</div>`).join('')
-   +`<div class="legend lm"><span class="badge">${ic('drive')}</span><span>Original is on your drive. Tap a photo to Load it.</span></div>`;
+  return groups.map(g=>`<div class="gh">${g.key}</div><div class="grid">${g.items.map(tile).join('')}</div>`).join('')+legend();
 }
-const freeBtn=st=>st.free?`<button class="btn tonal" data-act="freeStart">Free up space</button>`:'';
+const msIcon=k=>k==='ok'?ic('check',18):ic(k==='bad'?'alert':'drive',18);
+const mstate=ms=>`<span class="mstate ${ms.kind}">${msIcon(ms.kind)}${ms.text}</span>`;
 
-/* ============ variant A: one thing at a time ============ */
-function A(){
+/* ============ screens ============ */
+function home(){
   const st=status();
-  const home=`<div class="pad stack">
+  return `<div class="appbar"><h2 class="tl">Photoxpo</h2></div>
+  <div class="scroll" id="sc"><div class="pad stack">
     <div>${driveChip()}</div>
     <div class="stack" style="gap:12px">
       <h1 class="hs">${st.title}</h1>
       <p class="bl var">${st.sub}</p>
+      <p class="lastline bm">${ic('clock')}<span>Last backed up: <b>${S.last.when}</b> (${S.last.ago})</span></p>
     </div>
     ${st.progress!=null?prog(st.progress):''}
     ${primaryBtn(st.primary)}
     ${st.pause?`<button class="btn tonal" data-act="pause">${ic('pause')}Pause</button>`:''}
-    ${freeBtn(st)}
-    <button class="card" style="display:flex;align-items:center;gap:12px;text-align:left;width:100%" data-act="tab" data-t="photos">
-      ${ic('photos')}<div style="flex:1"><div class="tm">Your photos</div><div class="bm var">${(BASE+S.copied).toLocaleString()} backed up on your drive</div></div>${ic('chev')}
-    </button>
-  </div>`;
-  const photos=`<div class="appbar"><h2 class="tl">Photos</h2><div class="seg" role="group" aria-label="Group by"><button data-act="group" data-g="month" aria-pressed="${S.group==='month'}">Months</button><button data-act="group" data-g="day" aria-pressed="${S.group==='day'}">Days</button></div></div>
-    ${grouped(ITEMS,S.group)}`;
-  return `${S.tab==='home'?'<div class="appbar"><h2 class="tl">Photoxpo</h2></div>':''}
-   <div class="scroll" id="sc">${S.tab==='home'?home:photos}</div>
-   <nav class="nav" aria-label="Main">
-     <button data-act="tab" data-t="home" ${S.tab==='home'?'aria-current="page"':''}><span class="pill">${ic('home')}</span>Home</button>
-     <button data-act="tab" data-t="photos" ${S.tab==='photos'?'aria-current="page"':''}><span class="pill">${ic('photos')}</span>Photos</button>
-   </nav>`;
+    ${st.free?`<button class="btn tonal" data-act="freeStart">Free up space</button>`:''}
+    <button class="rowcard" data-act="tab" data-t="photos">${ic('photos')}<div class="tx"><div class="tm">Your photos</div><div class="bm var">${(BASE+S.copied).toLocaleString()} backed up on your drive</div></div>${ic('chev')}</button>
+    <button class="rowcard" data-act="hist">${ic('clock')}<div class="tx"><div class="tm">Backup history</div><div class="bm var">By month, by backup, photos and videos</div></div>${ic('chev')}</button>
+  </div></div>`;
 }
-
-/* ============ variant B: photos first ============ */
-function B(){
-  const st=status();
-  const cls=st.tone==='warn'?'warn':st.tone==='err'?'err':st.tone==='idle'||st.tone==='ok'&&false?'idle':'';
-  const toneCls=st.tone==='ok'?'':cls;
-  const icon=st.tone==='warn'?'plug':st.tone==='err'?'alert':st.tone==='ok'?'check':st.tone==='busy'?'drive':'drive';
-  let action='';
-  if(st.primary&&!st.primary.disabled)action=`<button class="btn sm" data-act="${st.primary.act}">${st.primary.label}</button>`;
-  if(st.pause)action=`<button class="btn sm tonal" data-act="pause">Pause</button>`;
-  if(st.free)action=`<button class="btn sm tonal" data-act="freeStart">Free up space</button>`;
-  const strip=`<div class="strip ${toneCls||(st.tone==='idle'?'idle':'')}" role="status">
-    <div class="top">${ic(icon)}<div><div class="tm">${st.title}</div><div class="bm" style="opacity:.85">${st.sub}</div></div>${action}</div>
-    ${st.progress!=null?prog(st.progress):''}</div>`;
-  return `<div class="appbar"><h2 class="tl">Photos</h2><div class="seg" role="group" aria-label="Group by"><button data-act="group" data-g="month" aria-pressed="${S.group==='month'}">Months</button><button data-act="group" data-g="day" aria-pressed="${S.group==='day'}">Days</button></div></div>
-   ${strip}
-   <div class="scroll" id="sc">${grouped(ITEMS,S.group)}</div>`;
+function photosTab(){
+  return `<div class="appbar"><h2 class="tl">Photos</h2><div class="seg" role="group" aria-label="Group by"><button data-act="group" data-g="month" aria-pressed="${S.group!=='day'}">Months</button><button data-act="group" data-g="day" aria-pressed="${S.group==='day'}">Days</button></div></div>
+  <div class="scroll" id="sc">${grouped(ITEMS,S.group)}</div>`;
 }
-
-/* ============ variant C: by month ============ */
-function C(){
-  const st=status();
+function gridPage(title,items,subline){
+  return `<div class="appbar back"><button class="iconbtn" data-act="closeSub" aria-label="Back">${ic('back')}</button><h2 class="tl">${title}</h2></div>
+  <div class="scroll" id="sc">${subline?`<div style="padding:0 16px 12px">${subline}</div>`:''}<div class="grid">${items.map(tile).join('')}</div>${legend()}</div>`;
+}
+function history(){
   if(S.month){
     const m=MONTHS.find(x=>x.k===S.month);
-    const ms=monthState(m);
-    return `<div class="appbar" style="padding-left:4px"><button class="iconbtn" data-act="closeMonth" aria-label="Back">${ic('back')}</button><h2 class="tl">${m.name}</h2></div>
-     <div class="scroll" id="sc"><div style="padding:0 16px 12px"><span class="mstate ${ms.kind}">${ms.kind==='ok'?ic('check',18):ic(ms.kind==='bad'?'alert':'drive',18)}${ms.text}</span> <span class="bm var">· ${m.count} items</span></div>
-     <div class="grid">${ITEMS.filter(i=>i.m===m.k).map(tile).join('')}</div><p class="sample bm">Showing ${m.n} of ${m.count} (sample).</p>
-     <div class="legend lm"><span class="badge">${ic('drive')}</span><span>Original is on your drive. Tap a photo to Load it.</span></div></div>`;
+    return gridPage(m.name,ITEMS.filter(i=>i.m===m.k),`${mstate(monthState(m))} <span class="bm var">· ${m.count} items (showing ${m.n})</span>`);
   }
-  const backedFrac=(BASE+S.copied)/TOTAL;
-  const waiting=S.newTotal-S.copied-S.failed;
-  const card=`<div class="card drivecard ${st.tone==='warn'?'warn':st.tone==='err'?'err':''}">
-    <div style="display:flex;align-items:center;gap:12px">${ic(S.drive==='in'?'drive':'plug',28)}<div style="flex:1"><div class="tm">${S.drive==='in'?'Your drive is connected':'Your drive is not connected'}</div></div></div>
-    <div class="cap" role="img" aria-label="${BASE+S.copied} on your drive, ${waiting} waiting"><i class="a" style="width:${backedFrac*100}%"></i><i class="b" style="width:${Math.max(0,waiting)/TOTAL*100}%"></i></div>
-    <div class="bm" style="opacity:.9;margin-bottom:12px">${(BASE+S.copied).toLocaleString()} backed up · ${Math.max(0,waiting)} waiting${S.failed?` · ${S.failed} to retry`:''}</div>
-    <div class="tl" style="margin-bottom:4px;font-size:calc(20px*var(--fs))">${st.title}</div>
-    <p class="bm" style="opacity:.9;margin-bottom:${st.primary||st.pause||st.free?'16px':'0'}">${st.sub}</p>
-    ${primaryBtn(st.primary)}${st.pause?`<button class="btn tonal" data-act="pause">${ic('pause')}Pause</button>`:''}${freeBtn(st)}
-  </div>`;
-  const rows=MONTHS.map(m=>{
-    const ms=monthState(m);
-    const th=ITEMS.filter(i=>i.m===m.k).slice(0,4).map(i=>`<span>${scene(i.id)}</span>`).join('');
-    return `<button class="mrow" data-act="month" data-k="${m.k}"><div class="strip4">${th}</div><div class="tx"><div class="tm">${m.name}</div><div class="bm var">${m.count} items</div><span class="mstate ${ms.kind}">${ms.kind==='ok'?ic('check',18):ic(ms.kind==='bad'?'alert':'drive',18)}${ms.text}</span></div>${ic('chev')}</button>`;
-  }).join('');
-  return `<div class="appbar"><h2 class="tl">Photoxpo</h2></div><div class="scroll" id="sc">${card}${rows}</div>`;
+  if(S.typeF){
+    const v=S.typeF==='video';
+    return gridPage(v?'Videos':'Photos',ITEMS.filter(i=>i.vid===v),`<span class="bm var">Showing a sample of ${v?'157':'1,189'}.</span>`);
+  }
+  const drive=S.drive==='in';
+  const note=`<div class="hnote">${ic('drive',22)}<div class="bm"><b>Saved on your drive.</b> ${drive?'Up to date with your drive.':`Showing what your phone last read from it, ${S.last.ago}. Plug in your drive to refresh.`}</div></div>`;
+  let body='';
+  if(S.histTab==='month'){
+    body=MONTHS.map(m=>{
+      const th=ITEMS.filter(i=>i.m===m.k).slice(0,4).map(i=>`<span>${scene(i.id)}</span>`).join('');
+      return `<button class="mrow" data-act="month" data-k="${m.k}"><div class="strip4">${th}</div><div class="tx"><div class="tm">${m.name}</div><div class="bm var">${m.count} items</div>${mstate(monthState(m))}</div>${ic('chev')}</button>`;
+    }).join('');
+  }else if(S.histTab==='backup'){
+    body=S.history.map((h,i)=>`<div class="brow"><span class="dot">${ic('check',20)}</span><div><div class="tm">${h.when}</div><div class="bm var">${h.n} photos and videos · ${h.gb} GB</div><div class="bm" style="color:var(--p);font-weight:500">Checked and matched</div></div></div>`).join('')
+      +(S.phase==='copying'?`<div class="brow"><span class="dot" style="background:var(--warn);color:var(--on-warn)">${ic('drive',20)}</span><div><div class="tm">Now</div><div class="bm var">${S.copied} of ${S.newTotal} so far</div></div></div>`:'');
+  }else{
+    const th=v=>ITEMS.filter(i=>i.vid===v).slice(0,4).map(i=>`<span>${scene(i.id)}</span>`).join('');
+    body=`<button class="mrow" data-act="type" data-t="photo"><div class="strip4">${th(false)}</div><div class="tx"><div class="tm">Photos</div><div class="bm var">1,189 items</div></div>${ic('chev')}</button>
+          <button class="mrow" data-act="type" data-t="video"><div class="strip4">${th(true)}</div><div class="tx"><div class="tm">Videos</div><div class="bm var">157 items</div></div>${ic('chev')}</button>`;
+  }
+  const seg=`<div style="padding:0 16px 8px"><div class="seg" role="group" aria-label="History by">${[['month','By month'],['backup','By backup'],['type','By type']].map(([k,l])=>`<button data-act="histTab" data-k="${k}" aria-pressed="${S.histTab===k}">${l}</button>`).join('')}</div></div>`;
+  return `<div class="appbar back"><button class="iconbtn" data-act="closeHist" aria-label="Back">${ic('back')}</button><h2 class="tl">Backup history</h2></div>
+  <div class="scroll" id="sc">${note}${seg}${body}</div>`;
 }
 
-/* ============ viewer (Preview + Load) ============ */
+/* ============ photo view ============ */
 function viewer(){
   const it=byId(S.photo);if(!it)return'';
   const ld=S.loads[it.id]||{s:'idle',pct:0};
-  const needLoad=!it.onPhone&&ld.s!=='done';
-  const drive=S.drive==='in';
-  const size=it.mb>=100?`${it.mb} MB`:`${it.mb} MB`;
-  let load='';
-  if(needLoad){
-    if(ld.s==='loading')load=`<div class="loadcard" role="status"><div class="tm">Loading Original… ${Math.round(ld.pct)}%</div>${prog(ld.pct/100)}<button class="btn tonal sm" style="align-self:flex-start" data-act="cancelLoad" data-id="${it.id}">Cancel</button></div>`;
-    else if(ld.s==='error')load=`<div class="loadcard" role="alert" style="background:var(--errc);color:var(--on-errc)"><div class="hint">${ic('alert')}<div><div class="tm">Your drive was unplugged</div><div class="bm">Plug it back in, then try again. Nothing was changed on your phone.</div></div></div>${drive?`<button class="btn" data-act="load" data-id="${it.id}">${ic('refresh')}Try again</button>`:`<button class="btn" disabled>${ic('plug')}Waiting for your drive</button>`}</div>`;
-    else if(drive)load=`<button class="btn" data-act="load" data-id="${it.id}">${ic('down')}Load Original · ${size}</button>`;
-    else load=`<div class="loadcard"><button class="btn" disabled>${ic('plug')}Connect your drive to Load</button><div class="hint bm">${ic('info',20)}<span>This photo's Original is only on your drive. This small Preview is what your phone keeps.</span></div></div>`;
-  }else if(ld.s==='done'){
-    load=`<div class="loadcard" role="status"><div class="hint">${ic('check')}<div><div class="tm">Loaded</div><div class="bm">Find it in Gallery, in the Photoxpo Loaded album.</div></div></div></div>`;
+  const here=onPhone(it), drive=S.drive==='in', backed=isBacked(it);
+  const size=`${it.mb} MB`;
+  const loading=ld.s==='loading', lerr=ld.s==='error';
+  let card='';
+  if(!here){
+    if(loading)card=`<div class="loadcard" role="status"><div class="tm">Loading Original… ${Math.round(ld.pct)}%</div>${prog(ld.pct/100)}<button class="btn tonal sm" style="align-self:flex-start" data-act="cancelLoad" data-id="${it.id}">Cancel</button></div>`;
+    else if(lerr)card=`<div class="loadcard err" role="alert"><div class="hint">${ic('alert')}<div><div class="tm">Your drive was unplugged</div><div class="bm">Plug it back in, then tap Load to try again. Nothing was changed on your phone.</div></div></div></div>`;
+    else if(!drive)card=`<div class="loadcard"><div class="hint bm">${ic('plug',22)}<span>Connect your drive to Load the Original. What you see here is the small Preview your phone keeps.</span></div></div>`;
   }
-  const w=where(it);
-  const head=`${it.vid?'Video':'Photo'} · ${fmtDay(it.date)}`;
-  const photo=`<div class="photo">${scene(it.id)}${it.vid?`<span class="vid" style="left:auto;right:12px;bottom:12px">${'<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'}${it.dur}</span>`:''}</div>`;
-  const close=`<button class="iconbtn" data-act="closeViewer" aria-label="Back">${ic('back')}</button>`;
-  if(S.variant==='A')return `<div class="viewer A ${fresh('v')}"><div class="top">${close}</div>${photo}<div class="sheet"><div><div class="tm">${head}</div><div class="bm var">${w}</div></div>${load}</div><div class="gesture" style="background:var(--bg)"><b></b></div></div>`;
-  if(S.variant==='B')return `<div class="viewer B ${fresh('v')}"><div class="top">${close}<div class="tm" style="margin-left:4px">${head}</div></div>${photo}<div class="bottom"><span class="chip">${ic(needLoad?'drive':'check',20)}${w}</span>${load}</div></div>`;
-  return `<div class="viewer C ${fresh('v')}"><div class="top">${close}</div>${photo}<div class="info"><div class="tl">${head}</div>${load}<dl class="kv bm"><dt>Taken</dt><dd>${fmtLong(it.date)}</dd><dt>Original</dt><dd>${size}</dd><dt>Where</dt><dd>${w}</dd></dl></div></div>`;
+  const photoCls=here?(fresh('o')?'sharpen':''):'pv';
+  let act3;
+  if(!here){
+    act3=`<button class="act main" data-act="load" data-id="${it.id}" ${(!drive||loading)?'disabled':''} aria-label="Load Original, ${size}"><span class="ring">${ic('down')}</span>Load · ${size}</button>`;
+  }else if(!S.opts.build1&&backed){
+    act3=`<button class="act" data-act="removeAsk" aria-label="Remove from this phone"><span class="ring">${ic('trash')}</span>Remove from phone</button>`;
+  }else{
+    act3=`<span class="act" style="opacity:.0;pointer-events:none"></span>`;
+  }
+  const chip=`<span class="chip ${here&&backed?'ok':''}">${ic(!here?'drive':backed?'check':'alert',20)}${where(it)}</span>`;
+  return `<div class="viewer ${fresh('v')}">
+    <div class="photo ${photoCls}">${scene(it.id)}${it.vid?`<span class="vid" style="left:auto;right:12px;bottom:200px"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>${it.dur}</span>`:''}</div>
+    <div class="top"><button class="iconbtn" data-act="closeViewer" aria-label="Back">${ic('back')}</button><div class="tm">${it.vid?'Video':'Photo'} · ${fmtDay(it.date)}</div>${here?'':'<span class="tag">Preview</span>'}</div>
+    <div class="bottom">${chip}${card}
+      <div class="actions">
+        <button class="act" data-act="share" aria-label="Share"><span class="ring">${ic('share')}</span>Share</button>
+        <button class="act" data-act="info" aria-label="Photo info"><span class="ring">${ic('info')}</span>Info</button>
+        ${act3}
+      </div></div></div>`;
 }
 
-/* ============ overlays ============ */
+/* ============ sheets ============ */
 function sheet(){
-  if(!S.sheet)return'';
+  const k=S.sheet;if(!k)return'';
+  const it=byId(S.photo);
   const n=BASE+S.copied;
-  if(S.sheet==='free1')return `<div class="dim"><div class="bsheet ${fresh('s')}" role="dialog" aria-label="Free up space">
-    <h2 class="tl">Free up space on this phone?</h2>
+  const wrap=(inner,cls='')=>`<div class="dim ${cls}" data-act="closeSheet"><div class="bsheet ${fresh('s')}" role="dialog" data-act="noop">${inner}</div></div>`;
+  if(k==='free1')return wrap(`<h2 class="tl">Free up space on this phone?</h2>
     <p class="bl">${n.toLocaleString()} photos and videos are safely on your drive and checked. This removes their big Originals from your phone. The small Previews stay, and you can Load any Original later.</p>
     <p class="bm var">Android will ask you to confirm before anything is removed.</p>
     <button class="btn" data-act="freeConfirm">Remove ${n.toLocaleString()} Originals · 38 GB</button>
-    <button class="btn text" style="align-self:center" data-act="freeClose">Not now</button></div></div>`;
-  return `<div class="dim"><div class="bsheet ${fresh('s')}" role="dialog" aria-label="Done">
-    <div style="display:flex;gap:12px;align-items:center">${ic('check',32)}<h2 class="tl">38 GB freed</h2></div>
+    <button class="btn text" style="align-self:center" data-act="closeSheet">Not now</button>`);
+  if(k==='free2')return wrap(`<div style="display:flex;gap:12px;align-items:center">${ic('check',32)}<h2 class="tl">38 GB freed</h2></div>
     <p class="bl">Your phone has more room. Your photos are all still here as Previews.</p>
-    <button class="btn" data-act="freeClose">Done</button></div></div>`;
+    <button class="btn" data-act="closeSheet">Done</button>`);
+  if(!it)return'';
+  if(k==='info'){
+    const here=onPhone(it);
+    return wrap(`<h2 class="tl">${it.vid?'Video':'Photo'} info</h2>
+    <dl class="kv bm">
+      <dt>Taken</dt><dd>${fmtLong(it.date)}</dd>
+      <dt>File name</dt><dd>${it.name}</dd>
+      <dt>Original</dt><dd>${it.mb} MB${it.vid?'':' · 4000 × 3000'}</dd>
+      <dt>Preview</dt><dd>${it.vid?'Poster frame':'about 180 KB · 720 px'}</dd>
+      <dt>Original is</dt><dd>${here?'on this phone':'on your drive only'}</dd>
+      <dt>Backed up</dt><dd>${isBacked(it)?'Yes, copied and checked':'Not yet'}</dd>
+      <dt>Drive folder</dt><dd>Photoxpo/Originals/${it.m.slice(0,4)}/${it.m}/</dd>
+    </dl>
+    <p class="lm var">Sample values for the prototype.</p>
+    <button class="btn tonal" data-act="closeSheet">Close</button>`);
+  }
+  if(k==='share'){
+    if(onPhone(it))return wrap(`<h2 class="tl">Share</h2>
+      <p class="bm var">Sends the Original (${it.mb} MB).</p>
+      <div class="targets">
+        <button data-act="shared" data-to="Messages"><span class="ring">${ic('chat')}</span>Messages</button>
+        <button data-act="shared" data-to="Mail"><span class="ring">${ic('mail')}</span>Mail</button>
+        <button data-act="shared" data-to="Nearby"><span class="ring">${ic('share')}</span>Nearby</button>
+        <button data-act="shared" data-to="More"><span class="ring">${ic('more')}</span>More</button>
+      </div>`);
+    return wrap(`<h2 class="tl">Share this photo</h2>
+      <p class="bl">Only the small Preview is on this phone. The Original is on your drive.</p>
+      <button class="btn" data-act="shared" data-to="the Preview">${ic('share')}Share the Preview</button>
+      ${drive3()?`<button class="btn tonal" data-act="loadFromShare" data-id="${it.id}">${ic('down')}Load Original first · ${it.mb} MB</button>`:`<button class="btn tonal" disabled>${ic('plug')}Connect your drive to share the Original</button>`}`);
+  }
+  if(k==='remove')return wrap(`<h2 class="tl">Remove from this phone?</h2>
+    <p class="bl">The Original (${it.mb} MB) leaves your phone. It stays safe on your drive and the Preview stays here. You can Load it again any time.</p>
+    <button class="btn err" data-act="removeGo">${ic('trash')}Remove from phone</button>
+    <button class="btn text" style="align-self:center" data-act="closeSheet">Keep it</button>`);
+  if(k==='sys')return `<div class="dim center" data-act="noop"><div class="sysdlg ${fresh('s')}" role="alertdialog"><div class="mock">Android system dialog (mock)</div><div style="font-size:18px;font-weight:500">Allow Photoxpo to delete this ${it.vid?'video':'photo'}?</div><div class="row2"><button data-act="closeSheet">Don't allow</button><button data-act="removeDone">Allow</button></div></div></div>`;
+  return'';
 }
+const drive3=()=>S.drive==='in';
 const toast=()=>S.toast?`<div class="toast ${fresh('t')}" role="status">${S.toast}</div>`:'';
 
 /* ============ render ============ */
@@ -476,31 +519,40 @@ const ANIM=new Set();
 const fresh=k=>ANIM.has(k)?'fresh':'';
 function render(){
   document.body.dataset.theme=S.opts.dark?'dark':'light';
+  document.body.classList.toggle('viewing',!!S.photo);
   document.documentElement.style.setProperty('--fs',S.opts.big?1.3:1);
   const scr=document.getElementById('screen');
   const old=scr.querySelector('#sc'); const top=old?old.scrollTop:0;
-  scr.innerHTML=`<div class="sb"><span>9:41</span><span>5G<i></i></span></div>`
-    +(S.variant==='A'?A():S.variant==='B'?B():C())
-    +`<div class="gesture"><b></b></div>`+viewer()+sheet()+toast();
+  const inHist=S.tab==='home'&&S.hist;
+  const main=inHist?history():S.tab==='home'?home():photosTab();
+  scr.innerHTML=`<div class="sb"><span>9:41</span><span>5G<i></i></span></div>${main}
+    <nav class="nav" aria-label="Main">
+     <button data-act="tab" data-t="home" ${S.tab==='home'?'aria-current="page"':''}><span class="pill">${ic('home')}</span>Home</button>
+     <button data-act="tab" data-t="photos" ${S.tab==='photos'?'aria-current="page"':''}><span class="pill">${ic('photos')}</span>Photos</button>
+    </nav><div class="gesture"><b></b></div>`+viewer()+sheet()+toast();
   ANIM.clear();
   const nw=scr.querySelector('#sc'); if(nw)nw.scrollTop=top;
-  document.getElementById('swl').textContent=`${S.variant} (${VARIANTS[S.variant]})`;
   document.getElementById('plugbtn').textContent=S.drive==='in'?'Unplug the drive':'Plug in the drive';
   document.querySelectorAll('#presets button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.p===S.preset)));
   document.querySelectorAll('[data-opt]').forEach(c=>c.checked=!!S.opts[c.dataset.opt]);
-  const {loads,...rest}=S;
-  document.getElementById('dump').textContent=JSON.stringify({variant:S.variant,drive:S.drive,phase:S.phase,pausedBy:S.pausedBy,copied:S.copied,failed:S.failed,waiting:Math.max(0,left()),screen:S.photo?`photo ${S.photo}`:S.month?`month ${S.month}`:S.variant==='A'?S.tab:'list',loads:Object.fromEntries(Object.entries(loads).map(([k,v])=>[k,v.s+(v.s==='loading'?' '+Math.round(v.pct)+'%':'')]))},null,1);
+  const it=S.photo&&byId(S.photo);
+  document.getElementById('dump').textContent=JSON.stringify({drive:S.drive,phase:S.phase,copied:S.copied,failed:S.failed,waiting:Math.max(0,left()),last:S.last.when,
+    screen:S.photo?`photo ${S.photo}`:inHist?`history/${S.month||S.typeF||S.histTab}`:S.tab,
+    ...(it?{original:onPhone(it)?'on phone':'drive only',load:(S.loads[it.id]||{}).s||'-'}:{})},null,1);
 }
-function setVariant(v){S.variant=v;S.photo=null;S.month=null;S.tab='home';const u=new URL(location);u.searchParams.set('variant',v);history.replaceState(null,'',u);render()}
-function cycle(d){const k=Object.keys(VARIANTS);setVariant(k[(k.indexOf(S.variant)+d+k.length)%k.length])}
 function say(t){S.toast=t;ANIM.add('t');render();clearTimeout(say.t);say.t=setTimeout(()=>{S.toast=null;render()},2600)}
 
 /* ============ actions ============ */
+S.group='month';
 const ACT={
-  prev:()=>cycle(-1),next:()=>cycle(1),
-  tab:d=>{S.tab=d.t;render()},group:d=>{S.group=d.g;render()},
-  month:d=>{S.month=d.k;render()},closeMonth:()=>{S.month=null;render()},
-  photo:d=>{S.photo=+d.id;ANIM.add('v');render()},closeViewer:()=>{S.photo=null;render()},
+  noop:()=>{},
+  tab:d=>{S.tab=d.t;S.hist=false;S.month=null;S.typeF=null;render()},
+  group:d=>{S.group=d.g;render()},
+  hist:()=>{S.hist=true;render()},closeHist:()=>{S.hist=false;render()},
+  histTab:d=>{S.histTab=d.k;render()},
+  month:d=>{S.month=d.k;render()},type:d=>{S.typeF=d.t;render()},
+  closeSub:()=>{S.month=null;S.typeF=null;render()},
+  photo:d=>{S.photo=+d.id;ANIM.add('v');render()},closeViewer:()=>{S.photo=null;S.sheet=null;render()},
   backup:()=>{if(S.drive!=='in')return;S.phase='copying';S.pausedBy=null;render()},
   pause:()=>{S.phase='paused';S.pausedBy='user';render()},
   resume:()=>{if(S.drive!=='in')return;S.phase='copying';S.pausedBy=null;render()},
@@ -514,8 +566,16 @@ const ACT={
     render();
   },
   load:d=>{if(S.drive!=='in')return;S.loads[d.id]={s:'loading',pct:0};render()},
+  loadFromShare:d=>{S.sheet=null;ACT.load(d)},
   cancelLoad:d=>{delete S.loads[d.id];render()},
-  freeStart:()=>{S.sheet='free1';ANIM.add('s');render()},freeConfirm:()=>{S.sheet='free2';ANIM.add('s');render()},freeClose:()=>{S.sheet=null;render()},
+  share:()=>{S.sheet='share';ANIM.add('s');render()},
+  shared:d=>{S.sheet=null;say(`Shared ${d.to==='the Preview'?'the Preview':'the Original'} via ${d.to} (mock)`)},
+  info:()=>{S.sheet='info';ANIM.add('s');render()},
+  removeAsk:()=>{S.sheet='remove';ANIM.add('s');render()},
+  removeGo:()=>{S.sheet='sys';ANIM.add('s');render()},
+  removeDone:()=>{const it=byId(S.photo);it.onPhone=false;delete S.loads[it.id];S.sheet=null;say('Removed from this phone. Still safe on your drive.')},
+  closeSheet:()=>{S.sheet=null;render()},
+  freeStart:()=>{S.sheet='free1';ANIM.add('s');render()},freeConfirm:()=>{S.sheet='free2';ANIM.add('s');render()},
 };
 document.addEventListener('click',e=>{
   const p=e.target.closest('#presets button');if(p){applyPreset(p.dataset.p);return}
@@ -526,10 +586,6 @@ document.addEventListener('change',e=>{
   const o=e.target.dataset&&e.target.dataset.opt;if(!o)return;
   S.opts[o]=e.target.checked;render();
 });
-document.addEventListener('keydown',e=>{
-  if(/INPUT|TEXTAREA/.test(document.activeElement.tagName)||document.activeElement.isContentEditable)return;
-  if(e.key==='ArrowLeft')cycle(-1);if(e.key==='ArrowRight')cycle(1);
-});
 
 /* ============ simulation tick ============ */
 setInterval(()=>{
@@ -538,12 +594,16 @@ setInterval(()=>{
     const stop=S.opts.failNext?S.newTotal-2:S.newTotal;
     S.copied=Math.min(stop,S.copied+3);
     if(S.opts.failNext&&S.copied>=stop){S.failed=2;S.phase='verifyFail';S.opts.failNext=false}
-    else if(S.copied>=S.newTotal){S.phase='done'}
+    else if(S.copied>=S.newTotal){S.phase='done';finishBackup()}
     dirty=true;
   }
   for(const k in S.loads){
     const l=S.loads[k];
-    if(l.s==='loading'){l.pct=Math.min(100,l.pct+4);if(l.pct>=100){l.s='done';say('Loaded to Photoxpo Loaded');}dirty=true}
+    if(l.s==='loading'){
+      l.pct=Math.min(100,l.pct+4);
+      if(l.pct>=100){l.s='done';ANIM.add('o');say('Loaded. Find it in Gallery, Photoxpo Loaded.');dirty=false}
+      else dirty=true;
+    }
   }
   if(dirty)render();
 },250);
@@ -551,9 +611,9 @@ setInterval(()=>{
 /* ============ boot ============ */
 document.getElementById('presets').innerHTML=PRESETS.map(([k,l])=>`<button class="pre" data-p="${k}" aria-pressed="false">${l}</button>`).join('');
 function fit(){
-  const k=Math.min(1,(innerHeight-90)/892,(innerWidth-32)/412);
+  const k=Math.min(1,(innerHeight-40)/892,(innerWidth-32)/412);
   const st=document.getElementById('stage');
-  st.style.transform=`scale(${k})`;st.style.marginBottom=`${(k-1)*892}px`;st.style.width=`${412}px`;
+  st.style.transform=`scale(${k})`;st.style.marginBottom=`${(k-1)*892}px`;
 }
 addEventListener('resize',fit);fit();
 render();
