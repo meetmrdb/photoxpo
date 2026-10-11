@@ -42,6 +42,11 @@ class PhotosRepository(
         dao.upsert(listOf(current.copy(originalOnPhone = true)))
     }
 
+    /** Records which phone item an Original came from and which Preview file shows it. */
+    suspend fun linkPhone(hash: String, mediaId: Long?, previewFile: String?) {
+        dao.linkPhone(hash, mediaId, previewFile)
+    }
+
     /**
      * Reads Manifests on [archiveDrive] and stores those Originals.
      * The drive wins for name, date, size, kind, source tag, and drive path.

@@ -241,6 +241,7 @@ class BackupController private constructor(
             ).copy(driveStatus = outcome.driveStatus)
         }
         persistLastBackedUp(outcome.result)
+        runPostRunWork()
         val status = _state.value.status
         if (status is BackupStatus.Paused && status.reason == PauseReason.DriveOut) {
             if (outcome.driveStatus == DriveStatus.Ready && !userStop.get()) {
@@ -249,6 +250,15 @@ class BackupController private constructor(
             return
         }
         stopService()
+    }
+
+    private suspend fun runPostRunWork() {
+        try {
+            withContext(Dispatchers.IO) { PostRunWork(appContext, settings).run() }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            // Previews are retried on the next run. Backed up never depends on them.
+        }
     }
 
     private fun shouldAbandon(): Boolean = userStop.get() || cancel.get()
