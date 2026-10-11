@@ -61,6 +61,7 @@ class BackupRunner(
     private val previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     private val newDriveId: () -> String = { UUID.randomUUID().toString() },
     private val fileCap: Int? = null,
+    private val previewPreset: PreviewPreset? = null,
     private val isCancelled: () -> Boolean = { false },
 ) {
     fun start(): BackupRunResult {
@@ -80,7 +81,7 @@ class BackupRunner(
             val committed = mergeByHash(
                 ManifestReader().readAll(archiveDrive).flatMap { it.entries },
             )
-            val header = headerLine(startedAt)
+            val header = headerLine(startedAt, previewPreset)
             archiveDrive.appendText(manifestPath, header + "\n")
             val linesByHash = linkedMapOf<String, String>()
             val manifest = object : ManifestCommit {
@@ -260,6 +261,7 @@ fun startBackupRun(
     previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     newDriveId: () -> String = { UUID.randomUUID().toString() },
     fileCap: Int? = null,
+    previewPreset: PreviewPreset? = null,
 ): BackupRunResult {
     return BackupRunner(
         mediaSource = mediaSource,
@@ -271,6 +273,7 @@ fun startBackupRun(
         previews = previews,
         newDriveId = newDriveId,
         fileCap = fileCap,
+        previewPreset = previewPreset,
     ).start()
 }
 
@@ -287,12 +290,15 @@ private fun manifestPath(startedAt: Instant): String {
     return "$BACKUP_RUNS_DIRECTORY/${RUN_FILE_STAMP.format(startedAt)}.jsonl"
 }
 
-private fun headerLine(startedAt: Instant): String {
-    return JsonLine()
+private fun headerLine(startedAt: Instant, previewPreset: PreviewPreset?): String {
+    val line = JsonLine()
         .field("type", "header")
         .field("startedAt", ISO_MILLIS.format(startedAt))
-        .nullField("previewPreset")
-        .build()
+    return if (previewPreset == null) {
+        line.nullField("previewPreset").build()
+    } else {
+        line.field("previewPreset", previewPreset.wireName()).build()
+    }
 }
 
 private fun fileLine(entry: ManifestFileEntry): String {
@@ -307,7 +313,7 @@ private fun fileLine(entry: ManifestFileEntry): String {
         .field("sourceTag", checkNotNull(entry.sourceTag))
         .field("originalFilename", entry.originalFilename)
         .field("originalFilenames", names)
-        .nullField("previewFileName")
+        .field("previewFileName", previewFileName(entry.hash))
         .build()
 }
 

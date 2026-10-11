@@ -54,7 +54,7 @@ class BackupRunnerTest {
         assertEquals("2020-01-31", field(fileLine, "chosenDate"))
         assertEquals("modified", field(fileLine, "sourceTag"))
         assertEquals("IMG_0001.jpg", field(fileLine, "originalFilename"))
-        assertEquals("null", field(fileLine, "previewFileName"))
+        assertEquals("$ORIGINAL_HASH.jpg", field(fileLine, "previewFileName"))
 
         val footer = lines[2]
         assertEquals("1", field(footer, "fileCount"))
@@ -64,6 +64,27 @@ class BackupRunnerTest {
         assertEquals("2026-10-11T18:30:00.000Z", field(footer, "endedAt"))
         assertEquals("0", field(footer, "elapsedMs"))
         assertEquals("0", field(footer, "mbPerSecond"))
+    }
+
+    @Test
+    fun previewPreset_isRecordedOnTheManifestHeader() {
+        val wireNames = mapOf(
+            PreviewPreset.SMALLER to "smaller",
+            PreviewPreset.BALANCED to "balanced",
+            PreviewPreset.SHARPER to "sharper",
+        )
+        for ((preset, wireName) in wireNames) {
+            val drive = FakeArchiveDrive(folders.newFolder("drive-${preset.name}").toPath())
+            val result = startBackupRun(
+                media(),
+                drive,
+                clock = fixedClock,
+                previewPreset = preset,
+            )
+            val lines = manifestLines(drive, result.manifestPath)
+            assertEquals(wireName, field(lines[0], "previewPreset"))
+            assertEquals("$ORIGINAL_HASH.jpg", field(lines[1], "previewFileName"))
+        }
     }
 
     @Test
