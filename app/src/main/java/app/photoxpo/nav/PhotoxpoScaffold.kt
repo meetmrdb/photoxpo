@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import app.photoxpo.history.HistoryRoute
 import app.photoxpo.onboarding.OnboardingRoute
 import app.photoxpo.photos.PhotoRoute
 import app.photoxpo.photos.PhotosRoute
@@ -69,7 +70,20 @@ fun PhotoxpoScaffold(
                 )
             }
             composable(AppRoutes.Home) {
-                HomeRoute(modifier = Modifier.padding(innerPadding))
+                HomeRoute(
+                    onOpenHistory = {
+                        navController.navigate(AppRoutes.History) {
+                            launchSingleTop = true
+                        }
+                    },
+                    modifier = Modifier.padding(innerPadding),
+                )
+            }
+            composable(AppRoutes.History) {
+                HistoryRoute(
+                    onBack = { navController.popBackStack() },
+                    modifier = Modifier.padding(innerPadding),
+                )
             }
             composable(AppRoutes.Photos) {
                 PhotosRoute(

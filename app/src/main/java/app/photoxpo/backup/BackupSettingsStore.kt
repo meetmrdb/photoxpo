@@ -8,7 +8,8 @@ import app.photoxpo.core.PreviewPreset
 
 /**
  * Phone-side memory for the Archive Drive: expected drive id, Backed up hashes,
- * last Backed up time, chosen tree, file cap, onboarding, and Preview preset.
+ * last Backed up time, the last time the Archive Drive was connected, chosen tree,
+ * file cap, onboarding, and Preview preset.
  */
 class BackupSettingsStore(
     context: Context,
@@ -63,6 +64,15 @@ class BackupSettingsStore(
         settings.edit().putLong(KEY_LAST_BACKED_UP_AT, epochMillis).commit()
     }
 
+    fun lastConnectedAtEpochMillis(): Long? {
+        if (!settings.contains(KEY_LAST_CONNECTED_AT)) return null
+        return settings.getLong(KEY_LAST_CONNECTED_AT, 0L)
+    }
+
+    fun setLastConnectedAtEpochMillis(epochMillis: Long) {
+        settings.edit().putLong(KEY_LAST_CONNECTED_AT, epochMillis).commit()
+    }
+
     override fun expected(): String? {
         val id = settings.getString(KEY_DRIVE_ID, null)?.trim()
         return id?.ifEmpty { null }
@@ -84,6 +94,7 @@ class BackupSettingsStore(
         const val SETTINGS_PREFS = "photoxpo.backup"
         const val LEDGER_PREFS = "photoxpo.backed-up"
         const val KEY_LAST_BACKED_UP_AT = "lastBackedUpAtEpochMillis"
+        const val KEY_LAST_CONNECTED_AT = "lastConnectedAtEpochMillis"
         const val KEY_DRIVE_ID = "expectedDriveId"
         const val KEY_TREE_URI = "treeUri"
         const val KEY_FILE_CAP = "fileCap"
