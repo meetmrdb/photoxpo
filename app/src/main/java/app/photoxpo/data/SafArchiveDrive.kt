@@ -123,10 +123,26 @@ class SafArchiveDrive(
     }
 
     override fun appendText(path: String, text: String) {
-        // "wa" is not used. Read the current bytes, then write the combined text with "wt".
         if (!exists(path)) {
             create(path)
         }
+        // The Manifest is the source of truth. Append in place so a kill can lose at most the last,
+        // partial line (the reader ignores it). Rewriting with "wt" would truncate every earlier line first.
+        val uri = synchronized(gate) { documentUri(requireDoc(path).documentId) }
+        val appended = try {
+            onDrive { resolver.openFileDescriptor(uri, "wa") }
+        } catch (e: DriveUnavailableException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+        if (appended != null) {
+            SyncingOutputStream(appended).use { output ->
+                output.write(text.toByteArray(Charsets.UTF_8))
+            }
+            return
+        }
+        // Provider rejects "wa": rewrite the combined text instead.
         val combined = readText(path) + text
         write(path).use { output ->
             output.write(combined.toByteArray(Charsets.UTF_8))

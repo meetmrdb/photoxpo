@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug-only test Archive Drive provider: lets instrumented tests drive SafArchiveDrive without the picker. -->
+    <application>
+        <provider
+            android:name="app.photoxpo.data.TestArchiveDocumentsProvider"
+            android:authorities="app.photoxpo.test.archive"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+    </application>
+</manifest>

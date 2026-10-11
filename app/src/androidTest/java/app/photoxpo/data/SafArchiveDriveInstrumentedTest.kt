@@ -18,6 +18,7 @@ import app.photoxpo.core.BackupRunner
 import app.photoxpo.core.CreateResult
 import app.photoxpo.core.DriveUnavailableException
 import app.photoxpo.core.ItemState
+import app.photoxpo.core.MediaSource
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -90,11 +91,6 @@ class SafArchiveDriveInstrumentedTest {
     fun oneOriginal_isBackedUp_withMatchingHashAndOneFileLine() {
         val target = targetContext()
         val source = MediaStoreSource(target)
-        val already = source.listCameraFolder()
-        check(already.isEmpty()) {
-            "DCIM/Camera already holds ${already.size} Originals. This test needs that folder empty."
-        }
-
         val bytes = jpegLikeBytes()
         val name = "px-e2e-${UUID.randomUUID()}.jpg"
         inserted = insertCameraOriginal(target, name, bytes)
@@ -103,7 +99,11 @@ class SafArchiveDriveInstrumentedTest {
         assertArrayEquals(bytes, sourceBytes)
 
         val drive = SafArchiveDrive(driveContext(), TestArchiveDocumentsProvider.treeUri())
-        val result = BackupRunner(source, drive).start()
+        // The emulator's DCIM/Camera may hold other photos; back up only the file this test inserted.
+        val onlyInserted = object : MediaSource by source {
+            override fun listCameraFolder() = source.listCameraFolder().filter { it.name == name }
+        }
+        val result = BackupRunner(onlyInserted, drive).start()
 
         val item = result.items.single()
         assertEquals(listed.id, item.id)
@@ -215,9 +215,9 @@ class SafArchiveDriveInstrumentedTest {
         while (true) {
             val files = source.listCameraFolder()
             val match = files.filter { file -> file.name == name }
-            if (match.size == 1 && files.size == 1) return match.single()
+            if (match.size == 1) return match.single()
             check(SystemClock.elapsedRealtime() < deadline) {
-                "Original $name did not appear alone in DCIM/Camera"
+                "Original $name did not appear in DCIM/Camera"
             }
             SystemClock.sleep(50)
         }
