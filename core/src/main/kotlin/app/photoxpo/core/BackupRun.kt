@@ -1,8 +1,5 @@
 package app.photoxpo.core
 
-import java.io.InputStream
-import java.io.OutputStream
-import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -16,6 +13,7 @@ enum class ItemState {
     VERIFYING,
     COMMITTED,
     NEEDS_ATTENTION,
+    PAUSED_DRIVE_OUT,
 }
 
 data class ChosenDate(
@@ -54,74 +52,57 @@ class BackupRunner(
     fun start(): BackupRunResult {
         val startedAt = clock.instant()
         val manifestPath = manifestPath(startedAt)
-        archiveDrive.appendText(manifestPath, headerLine(startedAt) + "\n")
-
-        var committedCount = 0
-        var committedBytes = 0L
+        val files = mediaSource.listCameraFolder().sortedBy { it.modifiedAtEpochMillis }
         val items = mutableListOf<BackupItemOutcome>()
-        for (file in mediaSource.listCameraFolder().sortedBy { it.modifiedAtEpochMillis }) {
-            val item = backUpFile(file, manifestPath)
-            if (item.state == ItemState.COMMITTED) {
-                committedCount += 1
-                committedBytes += file.sizeBytes
+        try {
+            val committed = ManifestReader().readAll(archiveDrive)
+                .flatMap { it.entries }
+                .toMutableList()
+            archiveDrive.appendText(manifestPath, headerLine(startedAt) + "\n")
+            val copier = OriginalCopier(
+                mediaSource = mediaSource,
+                archiveDrive = archiveDrive,
+                chooseDate = chooseDate,
+                committed = committed,
+                onCommit = { file, chosen, drivePath, hash ->
+                    // The manifest line is the commit point.
+                    archiveDrive.appendText(
+                        manifestPath,
+                        fileLine(file, chosen, drivePath, hash) + "\n",
+                    )
+                },
+            )
+            var committedCount = 0
+            var committedBytes = 0L
+            for (file in files) {
+                val copied = copier.copy(file)
+                if (copied.wroteManifestLine) {
+                    committedCount += 1
+                    committedBytes += file.sizeBytes
+                }
+                items += copied.outcome
             }
-            items += item
+            val endedAt = clock.instant()
+            archiveDrive.appendText(
+                manifestPath,
+                footerLine(startedAt, endedAt, committedCount, committedBytes) + "\n",
+            )
+            return BackupRunResult(manifestPath, items)
+        } catch (_: DriveUnavailableException) {
+            return pausedResult(manifestPath, files, items)
         }
-
-        val endedAt = clock.instant()
-        archiveDrive.appendText(
-            manifestPath,
-            footerLine(startedAt, endedAt, committedCount, committedBytes) + "\n",
-        )
-        return BackupRunResult(manifestPath, items)
     }
+}
 
-    private fun backUpFile(file: MediaFile, manifestPath: String): BackupItemOutcome {
-        val chosen = chooseDate.choose(file)
-        val finalPath = originalPath(chosen.localDate, file.name)
-        val partPath = "$finalPath.photoxpo-part"
-
-        if (archiveDrive.exists(partPath)) {
-            archiveDrive.delete(partPath)
-        }
-        when (archiveDrive.create(partPath)) {
-            is CreateResult.Collision -> return attention(file)
-            CreateResult.Created -> Unit
-        }
-
-        val copied = mediaSource.openOriginal(file.id).use { input ->
-            archiveDrive.write(partPath).use { output ->
-                copyHashed(input, output)
-            }
-        }
-        val readBack = archiveDrive.read(partPath).use { input ->
-            copyHashed(input, OutputStream.nullOutputStream())
-        }
-        val matches = copied.sha256 == readBack.sha256 &&
-            copied.byteCount == file.sizeBytes &&
-            readBack.byteCount == file.sizeBytes &&
-            archiveDrive.byteCount(partPath) == file.sizeBytes
-        if (!matches) {
-            archiveDrive.delete(partPath)
-            return attention(file)
-        }
-
-        when (archiveDrive.rename(partPath, finalPath)) {
-            is RenameResult.Collision -> {
-                archiveDrive.delete(partPath)
-                return attention(file)
-            }
-            RenameResult.Renamed -> Unit
-        }
-
-        // The manifest line is the commit point.
-        archiveDrive.appendText(manifestPath, fileLine(file, chosen, finalPath, copied.sha256) + "\n")
-        return BackupItemOutcome(file.id, file.name, ItemState.COMMITTED)
+private fun pausedResult(
+    manifestPath: String,
+    files: List<MediaFile>,
+    completed: List<BackupItemOutcome>,
+): BackupRunResult {
+    val remaining = files.drop(completed.size).map { file ->
+        BackupItemOutcome(file.id, file.name, ItemState.PAUSED_DRIVE_OUT)
     }
-
-    private fun attention(file: MediaFile): BackupItemOutcome {
-        return BackupItemOutcome(file.id, file.name, ItemState.NEEDS_ATTENTION)
-    }
+    return BackupRunResult(manifestPath, completed + remaining)
 }
 
 fun startBackupRun(
@@ -133,25 +114,7 @@ fun startBackupRun(
     return BackupRunner(mediaSource, archiveDrive, chooseDate, clock).start()
 }
 
-private data class HashedBytes(val sha256: String, val byteCount: Long)
-
-private fun copyHashed(input: InputStream, output: OutputStream): HashedBytes {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val buffer = ByteArray(COPY_BUFFER_BYTES)
-    var byteCount = 0L
-    while (true) {
-        val read = input.read(buffer)
-        if (read < 0) break
-        if (read == 0) continue
-        digest.update(buffer, 0, read)
-        output.write(buffer, 0, read)
-        byteCount += read
-    }
-    output.flush()
-    return HashedBytes(digest.digest().toHex(), byteCount)
-}
-
-private fun originalPath(localDate: String, filename: String): String {
+internal fun originalPath(localDate: String, filename: String): String {
     require(localDate.length >= 10 && localDate[4] == '-' && localDate[7] == '-') {
         "chosen date must be YYYY-MM-DD"
     }
@@ -161,7 +124,7 @@ private fun originalPath(localDate: String, filename: String): String {
 }
 
 private fun manifestPath(startedAt: Instant): String {
-    return "Photoxpo/.photoxpo/runs/${RUN_FILE_STAMP.format(startedAt)}.jsonl"
+    return "$BACKUP_RUNS_DIRECTORY/${RUN_FILE_STAMP.format(startedAt)}.jsonl"
 }
 
 private fun headerLine(startedAt: Instant): String {
@@ -215,20 +178,9 @@ private fun footerLine(
         .build()
 }
 
-private fun MediaKind.wireName(): String = when (this) {
+internal fun MediaKind.wireName(): String = when (this) {
     MediaKind.PHOTO -> "photo"
     MediaKind.VIDEO -> "video"
-}
-
-private fun ByteArray.toHex(): String {
-    val digits = "0123456789abcdef"
-    val chars = CharArray(size * 2)
-    for (index in indices) {
-        val value = this[index].toInt() and 0xff
-        chars[index * 2] = digits[value ushr 4]
-        chars[index * 2 + 1] = digits[value and 0x0f]
-    }
-    return String(chars)
 }
 
 private class JsonLine {
@@ -285,8 +237,6 @@ private fun jsonDouble(value: Double): String {
     if (!value.isFinite()) return "0"
     return String.format(Locale.US, "%.6f", value).trimEnd('0').trimEnd('.').ifEmpty { "0" }
 }
-
-private const val COPY_BUFFER_BYTES = 64 * 1024
 
 private val ISO_MILLIS: DateTimeFormatter =
     DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
