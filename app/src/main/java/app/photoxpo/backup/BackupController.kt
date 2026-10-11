@@ -188,6 +188,7 @@ class BackupController private constructor(
                         driveIdentity = settings,
                         backedUpLedger = progressLedger(recorded),
                         fileCap = cap,
+                        previewPreset = settings.previewPreset(),
                         isCancelled = { cancel.get() },
                     ).start()
                     RunOutcome(result, probeOrAbsent(uri))
