@@ -61,6 +61,7 @@ class BackupRunner(
     private val previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     private val newDriveId: () -> String = { UUID.randomUUID().toString() },
     private val fileCap: Int? = null,
+    private val isCancelled: () -> Boolean = { false },
 ) {
     fun start(): BackupRunResult {
         val startedAt = clock.instant()
@@ -113,6 +114,16 @@ class BackupRunner(
             var committedCount = 0
             var committedBytes = 0L
             for (file in files) {
+                // Between Originals, so a pause does not leave a partial Original.
+                if (isCancelled()) {
+                    return cancelBetweenFiles(
+                        manifestPath = manifestPath,
+                        files = files,
+                        items = items,
+                        deferred = deferred,
+                        manifestHasNoFileLine = linesByHash.isEmpty(),
+                    )
+                }
                 val allowNewCopy = fileCap == null || copies < fileCap
                 val copied = copier.copy(file, allowNewCopy)
                 if (copied.deferredByCap) {
@@ -140,6 +151,20 @@ class BackupRunner(
         } catch (_: DriveUnavailableException) {
             return pausedResult(manifestPath, files, items, deferred)
         }
+    }
+
+    private fun cancelBetweenFiles(
+        manifestPath: String,
+        files: List<MediaFile>,
+        items: List<BackupItemOutcome>,
+        deferred: Set<String>,
+        manifestHasNoFileLine: Boolean,
+    ): BackupRunResult {
+        if (manifestHasNoFileLine && archiveDrive.exists(manifestPath)) {
+            archiveDrive.delete(manifestPath)
+            return pausedResult("", files, items, deferred)
+        }
+        return pausedResult(manifestPath, files, items, deferred)
     }
 
     fun useThisDriveInstead() {
