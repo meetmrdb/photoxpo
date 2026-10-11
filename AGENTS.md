@@ -21,4 +21,4 @@ Claude orchestrates and follows the user-level `delegate-router` skill (`~/.clau
 - **Fine to delegate to agy (read-only):** summarizing `docs/`, research notes and ADRs, and checking wording against `GLOSSARY.md`.
 - Write delegated task text in the `GLOSSARY.md` terms (Archive Drive, Original, Preview, Backed up) and avoid the terms it lists under _Avoid_.
 - Delegate only from a clean git tree on a feature branch, never inside `.claude/worktrees/`.
-- Verify command: `./gradlew testDebugUnitTest` (JVM unit tests, run from the repo root). The Android project does not exist yet; the scaffold ticket (Build 1: Project scaffold and verify command) creates it, and this command must pass once it lands.
+- Verify command: `./gradlew testDebugUnitTest` (JVM unit tests, run from the repo root). Needs `ANDROID_HOME` or `local.properties` with `sdk.dir` (the file is gitignored).
