@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.ExifInterface
 import android.provider.MediaStore
 import app.photoxpo.core.MediaFile
 import app.photoxpo.core.MediaKind
@@ -34,6 +35,7 @@ class MediaStoreSource(
             val sizeCol = rows.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
             val modifiedCol = rows.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
             val typeCol = rows.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
+            val takenCol = rows.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_TAKEN)
             while (rows.moveToNext()) {
                 val name = rows.getString(nameCol) ?: continue
                 val kind = when (rows.getInt(typeCol)) {
@@ -42,16 +44,37 @@ class MediaStoreSource(
                     else -> continue
                 }
                 val modifiedSeconds = if (rows.isNull(modifiedCol)) 0L else rows.getLong(modifiedCol)
+                val id = rows.getLong(idCol)
+                val dateTaken = if (rows.isNull(takenCol)) null else rows.getLong(takenCol)
                 files += MediaFile(
-                    id = rows.getLong(idCol).toString(),
+                    id = id.toString(),
                     name = name,
                     sizeBytes = if (rows.isNull(sizeCol)) 0L else rows.getLong(sizeCol),
                     modifiedAtEpochMillis = modifiedSeconds * 1000L,
                     kind = kind,
+                    // Photos: EXIF wall-clock first, then MediaStore date taken. Videos: MediaStore date
+                    // taken is the container's UTC creation time; core treats a 1904 date as missing.
+                    exifDateTimeOriginal = if (kind == MediaKind.PHOTO) readExifDateTimeOriginal(id) else null,
+                    dateTakenEpochMillis = if (kind == MediaKind.PHOTO) dateTaken else null,
+                    videoMetadataUtcEpochMillis = if (kind == MediaKind.VIDEO) dateTaken else null,
                 )
             }
         }
         return files
+    }
+
+    /** EXIF DateTimeOriginal as written ("yyyy:MM:dd HH:mm:ss"), read from the file header only. */
+    private fun readExifDateTimeOriginal(id: Long): String? {
+        val uri = ContentUris.withAppendedId(MediaStore.Files.getContentUri("external"), id)
+        return try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                ExifInterface(input).getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
     }
 
     override fun openOriginal(id: String): InputStream {
@@ -77,6 +100,7 @@ class MediaStoreSource(
             MediaStore.Files.FileColumns.DISPLAY_NAME,
             MediaStore.Files.FileColumns.SIZE,
             MediaStore.Files.FileColumns.DATE_MODIFIED,
+            MediaStore.Files.FileColumns.DATE_TAKEN,
             MediaStore.Files.FileColumns.MEDIA_TYPE,
         )
 
