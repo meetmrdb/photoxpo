@@ -45,7 +45,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences("spike", MODE_PRIVATE);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(16, 16, 16, 16);
+        root.setPadding(16, 260, 16, 80);
         scroll = new ScrollView(this);
         logView = new TextView(this);
         logView.setTextSize(11);
@@ -169,12 +169,12 @@ public class MainActivity extends Activity {
             String[] proj = {MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME,
                     MediaStore.MediaColumns.MIME_TYPE, MediaStore.MediaColumns.SIZE,
                     MediaStore.MediaColumns.DATE_TAKEN, MediaStore.MediaColumns.DATE_MODIFIED};
-            // newest first, but spread: take every 7th row so the sample covers different ages
+            // newest first, but spread: take every Nth row so the sample covers different ages
             try (Cursor q = cr.query(src, proj, MediaStore.MediaColumns.RELATIVE_PATH + " LIKE ?",
                     new String[]{"DCIM/Camera%"}, MediaStore.MediaColumns.DATE_TAKEN + " DESC")) {
-                int i = 0, done = 0;
+                int i = 0, done = 0, stride = Math.max(1, q.getCount() / limit);
                 while (q != null && q.moveToNext() && done < limit) {
-                    if (i++ % 7 != 0) continue;
+                    if (i++ % stride != 0) continue;
                     done++;
                     Uri u = ContentUris.withAppendedId(src, q.getLong(0));
                     one(cr, u, q.getString(1), q.getString(2), q.getLong(3), q.getLong(4), video);
