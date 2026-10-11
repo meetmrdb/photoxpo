@@ -18,10 +18,13 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,8 +34,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import app.photoxpo.PhotoxpoApp
 import app.photoxpo.R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.util.Locale
@@ -55,7 +63,12 @@ fun PhotoRoute(
     when {
         loaded == null -> PhotoMessage(message = "", onBack = onBack, showMessage = false)
         photo == null -> PhotoMessage(message = "This photo is not on this phone.", onBack = onBack)
-        else -> PhotoViewer(photo = photo, previewCache = previewCache, onBack = onBack)
+        else -> PhotoViewer(
+            photo = photo,
+            repository = repository,
+            previewCache = previewCache,
+            onBack = onBack,
+        )
     }
 }
 
@@ -93,10 +106,39 @@ private fun PhotoMessage(
 @Composable
 private fun PhotoViewer(
     photo: PhotoEntity,
+    repository: PhotosRepository,
     previewCache: PreviewBitmapCache,
     onBack: () -> Unit,
 ) {
-    val filesDir = LocalContext.current.filesDir
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val services = (context.applicationContext as PhotoxpoApp).services
+    val controller = remember(photo.hash) {
+        LoadController(
+            archiveDrive = services::archiveDrive,
+            gallery = services.phoneGallery,
+            repository = repository,
+            scope = scope,
+        )
+    }
+    LaunchedEffect(photo.hash) {
+        withContext(Dispatchers.IO) {
+            services.refreshDriveOnline()
+        }
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                scope.launch(Dispatchers.IO) {
+                    services.refreshDriveOnline()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val filesDir = context.filesDir
     val previewSizeBytes by produceState<Long?>(initialValue = null, photo.hash) {
         value = withContext(Dispatchers.IO) {
             val file = previewJpeg(filesDir, photo.hash)
@@ -136,7 +178,7 @@ private fun PhotoViewer(
                 .navigationBarsPadding()
                 .padding(24.dp),
         ) {
-            LoadSlot(photo)
+            LoadSlot(photo = photo, repository = repository, controller = controller)
         }
     }
 

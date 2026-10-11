@@ -4,7 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 
 @Composable
-fun LoadSlot(photo: PhotoEntity) {
-    // Filled by ticket #32.
-    key(photo.hash) {}
+fun LoadSlot(
+    photo: PhotoEntity,
+    repository: PhotosRepository,
+    controller: LoadController,
+) {
+    // Filled by the photo view in this ticket.
+    key(photo.hash, repository, controller) {}
 }
