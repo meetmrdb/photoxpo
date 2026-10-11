@@ -48,7 +48,7 @@ data class BackupRunResult(
 class BackupRunner(
     private val mediaSource: MediaSource,
     private val archiveDrive: ArchiveDrive,
-    private val chooseDate: DateChooser = DateChooser(::chooseModifiedTimeUtc),
+    private val chooseDate: DateChooser = DateChooser(::chooseCaptureDate),
     private val clock: Clock = Clock.systemUTC(),
 ) {
     fun start(): BackupRunResult {
@@ -127,7 +127,7 @@ class BackupRunner(
 fun startBackupRun(
     mediaSource: MediaSource,
     archiveDrive: ArchiveDrive,
-    chooseDate: DateChooser = DateChooser(::chooseModifiedTimeUtc),
+    chooseDate: DateChooser = DateChooser(::chooseCaptureDate),
     clock: Clock = Clock.systemUTC(),
 ): BackupRunResult {
     return BackupRunner(mediaSource, archiveDrive, chooseDate, clock).start()
