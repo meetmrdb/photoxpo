@@ -6,6 +6,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
 
 enum class ItemState {
     FOUND,
@@ -14,6 +15,12 @@ enum class ItemState {
     COMMITTED,
     NEEDS_ATTENTION,
     PAUSED_DRIVE_OUT,
+}
+
+enum class BackupRunStatus {
+    Completed,
+    Paused,
+    DriveMismatch,
 }
 
 data class ChosenDate(
@@ -41,6 +48,7 @@ data class BackupItemOutcome(
 data class BackupRunResult(
     val manifestPath: String,
     val items: List<BackupItemOutcome>,
+    val status: BackupRunStatus = BackupRunStatus.Completed,
 )
 
 class BackupRunner(
@@ -48,38 +56,79 @@ class BackupRunner(
     private val archiveDrive: ArchiveDrive,
     private val chooseDate: DateChooser = DateChooser(::chooseCaptureDate),
     private val clock: Clock = Clock.systemUTC(),
+    private val driveIdentity: DriveIdentityStore = InMemoryDriveIdentityStore(),
+    private val backedUpLedger: BackedUpLedger = InMemoryBackedUpLedger(),
+    private val previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
+    private val newDriveId: () -> String = { UUID.randomUUID().toString() },
+    private val fileCap: Int? = null,
     private val previewPreset: PreviewPreset? = null,
 ) {
     fun start(): BackupRunResult {
         val startedAt = clock.instant()
         val manifestPath = manifestPath(startedAt)
-        val files = mediaSource.listCameraFolder().sortedBy { it.modifiedAtEpochMillis }
+        val files = sortedFiles()
         val items = mutableListOf<BackupItemOutcome>()
+        val deferred = mutableSetOf<String>()
         try {
-            val committed = ManifestReader().readAll(archiveDrive)
-                .flatMap { it.entries }
-                .toMutableList()
-            archiveDrive.appendText(manifestPath, headerLine(startedAt, previewPreset) + "\n")
+            if (driveRejected()) {
+                return BackupRunResult(
+                    manifestPath = "",
+                    items = emptyList(),
+                    status = BackupRunStatus.DriveMismatch,
+                )
+            }
+            val committed = mergeByHash(
+                ManifestReader().readAll(archiveDrive).flatMap { it.entries },
+            )
+            val header = headerLine(startedAt, previewPreset)
+            archiveDrive.appendText(manifestPath, header + "\n")
+            val linesByHash = linkedMapOf<String, String>()
+            val manifest = object : ManifestCommit {
+                override fun appendStored(entry: ManifestFileEntry) {
+                    val line = fileLine(entry)
+                    linesByHash[entry.hash] = line
+                    // The manifest line is the commit point.
+                    archiveDrive.appendText(manifestPath, line + "\n")
+                }
+
+                override fun updateNames(entry: ManifestFileEntry) {
+                    val line = fileLine(entry)
+                    if (linesByHash.containsKey(entry.hash)) {
+                        linesByHash[entry.hash] = line
+                        archiveDrive.delete(manifestPath)
+                        archiveDrive.appendText(manifestPath, manifestBody(header, linesByHash))
+                    } else {
+                        linesByHash[entry.hash] = line
+                        archiveDrive.appendText(manifestPath, line + "\n")
+                    }
+                }
+            }
             val copier = OriginalCopier(
                 mediaSource = mediaSource,
                 archiveDrive = archiveDrive,
                 chooseDate = chooseDate,
                 committed = committed,
-                onCommit = { file, chosen, drivePath, hash ->
-                    // The manifest line is the commit point.
-                    archiveDrive.appendText(
-                        manifestPath,
-                        fileLine(file, chosen, drivePath, hash) + "\n",
-                    )
-                },
+                manifest = manifest,
             )
+            var copies = 0
             var committedCount = 0
             var committedBytes = 0L
             for (file in files) {
-                val copied = copier.copy(file)
-                if (copied.wroteManifestLine) {
+                val allowNewCopy = fileCap == null || copies < fileCap
+                val copied = copier.copy(file, allowNewCopy)
+                if (copied.deferredByCap) {
+                    deferred += file.id
+                    continue
+                }
+                if (copied.hash != null && copied.outcome.state == ItemState.COMMITTED) {
+                    backedUpLedger.record(file.id, copied.hash)
+                }
+                if (copied.wroteNewFileLine) {
                     committedCount += 1
                     committedBytes += file.sizeBytes
+                }
+                if (copied.copiedFile) {
+                    copies += 1
                 }
                 items += copied.outcome
             }
@@ -88,22 +137,93 @@ class BackupRunner(
                 manifestPath,
                 footerLine(startedAt, endedAt, committedCount, committedBytes) + "\n",
             )
-            return BackupRunResult(manifestPath, items)
+            return BackupRunResult(manifestPath, items, BackupRunStatus.Completed)
         } catch (_: DriveUnavailableException) {
-            return pausedResult(manifestPath, files, items)
+            return pausedResult(manifestPath, files, items, deferred)
         }
     }
+
+    fun useThisDriveInstead() {
+        backedUpLedger.clear()
+        previews.markOriginalNotOnThisDrive()
+        val id = newDriveId()
+        writeDriveId(id)
+        driveIdentity.remember(id)
+    }
+
+    private fun sortedFiles(): List<MediaFile> {
+        return mediaSource.listCameraFolder().sortedWith(
+            compareBy<MediaFile> { chooseDate.choose(it).localDate }
+                .thenBy { it.modifiedAtEpochMillis }
+                .thenBy { it.id },
+        )
+    }
+
+    private fun driveRejected(): Boolean {
+        val onDrive = readDriveId()
+        val expected = driveIdentity.expected()
+        if (expected != null && onDrive != expected) return true
+        if (onDrive == null) {
+            val id = newDriveId()
+            writeDriveId(id)
+            driveIdentity.remember(id)
+        } else if (expected == null) {
+            driveIdentity.remember(onDrive)
+        }
+        return false
+    }
+
+    private fun readDriveId(): String? {
+        if (!archiveDrive.exists(DRIVE_ID_PATH)) return null
+        val text = archiveDrive.readText(DRIVE_ID_PATH).trim()
+        return text.ifEmpty { null }
+    }
+
+    private fun writeDriveId(id: String) {
+        if (archiveDrive.exists(DRIVE_ID_PATH)) {
+            archiveDrive.delete(DRIVE_ID_PATH)
+        }
+        archiveDrive.appendText(DRIVE_ID_PATH, id.trim() + "\n")
+    }
+}
+
+private fun manifestBody(header: String, linesByHash: Map<String, String>): String {
+    return buildString {
+        append(header)
+        append('\n')
+        for (line in linesByHash.values) {
+            append(line)
+            append('\n')
+        }
+    }
+}
+
+private fun mergeByHash(entries: List<ManifestFileEntry>): MutableList<ManifestFileEntry> {
+    val merged = linkedMapOf<String, ManifestFileEntry>()
+    for (entry in entries) {
+        val prior = merged[entry.hash]
+        if (prior == null) {
+            val names = entry.originalFilenames.ifEmpty { listOf(entry.originalFilename) }
+            merged[entry.hash] = entry.copy(originalFilenames = names)
+        } else {
+            val names = (prior.originalFilenames + entry.originalFilenames).distinct()
+            merged[entry.hash] = prior.copy(originalFilenames = names)
+        }
+    }
+    return merged.values.toMutableList()
 }
 
 private fun pausedResult(
     manifestPath: String,
     files: List<MediaFile>,
     completed: List<BackupItemOutcome>,
+    deferred: Set<String>,
 ): BackupRunResult {
-    val remaining = files.drop(completed.size).map { file ->
+    val done = completed.map { it.id }.toSet()
+    val remaining = files.filter { it.id !in done && it.id !in deferred }.map { file ->
         BackupItemOutcome(file.id, file.name, ItemState.PAUSED_DRIVE_OUT)
     }
-    return BackupRunResult(manifestPath, completed + remaining)
+    return BackupRunResult(manifestPath, completed + remaining, BackupRunStatus.Paused)
 }
 
 fun startBackupRun(
@@ -111,9 +231,25 @@ fun startBackupRun(
     archiveDrive: ArchiveDrive,
     chooseDate: DateChooser = DateChooser(::chooseCaptureDate),
     clock: Clock = Clock.systemUTC(),
+    driveIdentity: DriveIdentityStore = InMemoryDriveIdentityStore(),
+    backedUpLedger: BackedUpLedger = InMemoryBackedUpLedger(),
+    previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
+    newDriveId: () -> String = { UUID.randomUUID().toString() },
+    fileCap: Int? = null,
     previewPreset: PreviewPreset? = null,
 ): BackupRunResult {
-    return BackupRunner(mediaSource, archiveDrive, chooseDate, clock, previewPreset).start()
+    return BackupRunner(
+        mediaSource = mediaSource,
+        archiveDrive = archiveDrive,
+        chooseDate = chooseDate,
+        clock = clock,
+        driveIdentity = driveIdentity,
+        backedUpLedger = backedUpLedger,
+        previews = previews,
+        newDriveId = newDriveId,
+        fileCap = fileCap,
+        previewPreset = previewPreset,
+    ).start()
 }
 
 internal fun originalPath(localDate: String, filename: String): String {
@@ -140,22 +276,19 @@ private fun headerLine(startedAt: Instant, previewPreset: PreviewPreset?): Strin
     }
 }
 
-private fun fileLine(
-    file: MediaFile,
-    chosen: ChosenDate,
-    drivePath: String,
-    hash: String,
-): String {
+private fun fileLine(entry: ManifestFileEntry): String {
+    val names = entry.originalFilenames.ifEmpty { listOf(entry.originalFilename) }
     return JsonLine()
         .field("type", "file")
-        .field("hash", hash)
-        .field("drivePath", drivePath)
-        .field("size", file.sizeBytes)
-        .field("kind", file.kind.wireName())
-        .field("chosenDate", chosen.localDate)
-        .field("sourceTag", chosen.sourceTag)
-        .field("originalFilename", file.name)
-        .field("previewFileName", previewFileName(hash))
+        .field("hash", entry.hash)
+        .field("drivePath", entry.drivePath)
+        .field("size", entry.size)
+        .field("kind", checkNotNull(entry.kind))
+        .field("chosenDate", checkNotNull(entry.chosenDate))
+        .field("sourceTag", checkNotNull(entry.sourceTag))
+        .field("originalFilename", entry.originalFilename)
+        .field("originalFilenames", names)
+        .field("previewFileName", previewFileName(entry.hash))
         .build()
 }
 
@@ -199,6 +332,11 @@ private class JsonLine {
     fun field(name: String, value: Boolean): JsonLine = raw(name, value.toString())
 
     fun field(name: String, value: Double): JsonLine = raw(name, jsonDouble(value))
+
+    fun field(name: String, values: List<String>): JsonLine {
+        val encoded = values.joinToString(prefix = "[", postfix = "]", separator = ",") { jsonString(it) }
+        return raw(name, encoded)
+    }
 
     fun nullField(name: String): JsonLine = raw(name, "null")
 

@@ -7,6 +7,7 @@ data class ManifestFileEntry(
     val drivePath: String,
     val size: Long,
     val originalFilename: String,
+    val originalFilenames: List<String> = listOf(originalFilename),
     val kind: String? = null,
     val chosenDate: String? = null,
     val sourceTag: String? = null,
@@ -62,13 +63,24 @@ private fun Map<String, JsonField>.toFileEntry(): ManifestFileEntry? {
     val hash = text("hash") ?: return null
     val drivePath = text("drivePath") ?: return null
     val size = long("size") ?: return null
-    val originalFilename = text("originalFilename") ?: return null
+    val listedNames = when (val names = this["originalFilenames"]) {
+        null, JsonField.Null -> emptyList()
+        is JsonField.Strings -> names.value.filter { it.isNotEmpty() }
+        else -> return null
+    }
+    val originalFilename = text("originalFilename") ?: listedNames.firstOrNull() ?: return null
     if (hash.isEmpty() || drivePath.isEmpty() || originalFilename.isEmpty() || size < 0) return null
+    val filenames = when {
+        listedNames.isEmpty() -> listOf(originalFilename)
+        originalFilename !in listedNames -> listOf(originalFilename) + listedNames
+        else -> listedNames
+    }
     return ManifestFileEntry(
         hash = hash,
         drivePath = drivePath,
         size = size,
         originalFilename = originalFilename,
+        originalFilenames = filenames,
         kind = text("kind"),
         chosenDate = text("chosenDate"),
         sourceTag = text("sourceTag"),
@@ -77,6 +89,7 @@ private fun Map<String, JsonField>.toFileEntry(): ManifestFileEntry? {
 
 private sealed interface JsonField {
     data class Text(val value: String) : JsonField
+    data class Strings(val value: List<String>) : JsonField
     data class Integer(val value: Long) : JsonField
     data class Decimal(val raw: String) : JsonField
     data object True : JsonField
@@ -118,11 +131,30 @@ private class JsonObjectParser(private val line: String) {
         if (index >= line.length) return null
         return when (line[index]) {
             '"' -> parseString()?.let { JsonField.Text(it) }
+            '[' -> parseStringArray()
             't' -> if (literal("true")) JsonField.True else null
             'f' -> if (literal("false")) JsonField.False else null
             'n' -> if (literal("null")) JsonField.Null else null
             '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' -> parseNumber()
             else -> null
+        }
+    }
+
+    private fun parseStringArray(): JsonField? {
+        if (!eat('[')) return null
+        skipWs()
+        if (eat(']')) return JsonField.Strings(emptyList())
+        val values = mutableListOf<String>()
+        while (true) {
+            skipWs()
+            val value = parseString() ?: return null
+            values += value
+            skipWs()
+            when {
+                eat(']') -> return JsonField.Strings(values)
+                eat(',') -> continue
+                else -> return null
+            }
         }
     }
 

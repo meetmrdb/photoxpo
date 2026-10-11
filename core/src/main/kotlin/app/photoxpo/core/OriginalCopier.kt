@@ -6,119 +6,197 @@ import java.security.MessageDigest
 
 internal data class FileBackupResult(
     val outcome: BackupItemOutcome,
-    val wroteManifestLine: Boolean,
+    val wroteNewFileLine: Boolean,
+    val copiedFile: Boolean,
+    val deferredByCap: Boolean,
+    val hash: String?,
 )
+
+internal interface ManifestCommit {
+    fun appendStored(entry: ManifestFileEntry)
+
+    fun updateNames(entry: ManifestFileEntry)
+}
 
 internal class OriginalCopier(
     private val mediaSource: MediaSource,
     private val archiveDrive: ArchiveDrive,
     private val chooseDate: DateChooser,
     private val committed: MutableList<ManifestFileEntry>,
-    private val onCommit: (MediaFile, ChosenDate, String, String) -> Unit,
+    private val manifest: ManifestCommit,
 ) {
-    fun copy(file: MediaFile): FileBackupResult {
+    fun copy(file: MediaFile, allowNewCopy: Boolean): FileBackupResult {
         val chosen = chooseDate.choose(file)
-        val finalPath = originalPath(chosen.localDate, file.name)
-        val partPath = "$finalPath$PART_SUFFIX"
-        // A part file is never resumed. Delete it and copy from byte 0 when a copy is still required.
-        if (archiveDrive.exists(partPath)) {
-            archiveDrive.delete(partPath)
+        val intended = originalPath(chosen.localDate, file.name)
+        deletePart(intended)
+
+        val source = hashSource(file)
+        if (source.byteCount != file.sizeBytes) {
+            return attention(file)
         }
 
-        if (alreadyCommitted(file, finalPath)) {
-            return committedResult(file, wroteManifestLine = false)
+        if (listedAndVerified(intended, source)) {
+            return backedUp(file, source.sha256)
         }
 
-        if (archiveDrive.exists(finalPath)) {
-            if (committed.any { it.drivePath == finalPath }) {
-                return attention(file)
+        val stored = committed.firstOrNull { entry ->
+            entry.hash == source.sha256 && verifiedOnDrive(entry.drivePath, source)
+        }
+        if (stored != null) {
+            if (file.name !in stored.originalFilenames) {
+                linkName(stored, file.name)
             }
-            val hash = hashIfIdentical(file, finalPath)
-            if (hash != null) {
-                commit(file, chosen, finalPath, hash)
-                return committedResult(file, wroteManifestLine = true)
-            }
-            return displaceUnproven(file, chosen, finalPath, partPath)
+            return backedUp(file, source.sha256)
         }
 
-        return copyToFinal(file, chosen, finalPath, partPath)
+        val shortPath = originalPath(chosen.localDate, fileNameWithShortHash(file.name, source.sha256))
+        val intendedMatches = verifiedOnDrive(intended, source)
+        val destination = if (!archiveDrive.exists(intended) || intendedMatches) {
+            intended
+        } else {
+            shortPath
+        }
+        val destinationMatches = if (destination == intended) {
+            intendedMatches
+        } else {
+            verifiedOnDrive(destination, source)
+        }
+        if (destinationMatches) {
+            if (listedAndVerified(destination, source)) {
+                return backedUp(file, source.sha256)
+            }
+            storeNew(file, chosen, destination, source.sha256)
+            return FileBackupResult(
+                outcome = BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
+                wroteNewFileLine = true,
+                copiedFile = false,
+                deferredByCap = false,
+                hash = source.sha256,
+            )
+        }
+
+        if (!allowNewCopy) {
+            return FileBackupResult(
+                outcome = BackupItemOutcome(file.id, file.name, ItemState.FOUND),
+                wroteNewFileLine = false,
+                copiedFile = false,
+                deferredByCap = true,
+                hash = null,
+            )
+        }
+
+        deletePart(destination)
+        if (!archiveDrive.exists(destination)) {
+            return copyToFinal(file, chosen, destination, source)
+        }
+        if (committed.any { it.drivePath == destination }) {
+            return attention(file)
+        }
+        return displaceUnproven(file, chosen, destination, source)
     }
 
-    private fun alreadyCommitted(file: MediaFile, finalPath: String): Boolean {
-        val listed = committed.any { entry ->
-            entry.drivePath == finalPath && entry.size == file.sizeBytes
-        }
-        if (!listed) return false
-        if (!archiveDrive.exists(finalPath)) return false
-        return archiveDrive.byteCount(finalPath) == file.sizeBytes
+    private fun listedAndVerified(path: String, source: HashedBytes): Boolean {
+        val listed = committed.any { it.drivePath == path && it.hash == source.sha256 }
+        return listed && verifiedOnDrive(path, source)
     }
 
-    private fun hashIfIdentical(file: MediaFile, finalPath: String): String? {
-        val source = mediaSource.openOriginal(file.id).use { input ->
+    private fun verifiedOnDrive(path: String, source: HashedBytes): Boolean {
+        if (!archiveDrive.exists(path)) return false
+        if (archiveDrive.byteCount(path) != source.byteCount) return false
+        val onDrive = archiveDrive.read(path).use { input ->
             copyHashed(input, OutputStream.nullOutputStream())
         }
-        val onDrive = archiveDrive.read(finalPath).use { input ->
-            copyHashed(input, OutputStream.nullOutputStream())
+        return onDrive.sha256 == source.sha256 && onDrive.byteCount == source.byteCount
+    }
+
+    private fun linkName(existing: ManifestFileEntry, filename: String) {
+        val names = (existing.originalFilenames + filename).distinct()
+        val updated = existing.copy(originalFilenames = names)
+        manifest.updateNames(updated)
+        val index = committed.indexOfFirst { it.hash == existing.hash }
+        if (index >= 0) {
+            committed[index] = updated
         }
-        val listedSize = archiveDrive.byteCount(finalPath)
-        val matches = source.sha256 == onDrive.sha256 &&
-            source.byteCount == file.sizeBytes &&
-            onDrive.byteCount == file.sizeBytes &&
-            listedSize == file.sizeBytes
-        if (!matches) return null
-        return source.sha256
+    }
+
+    private fun storeNew(file: MediaFile, chosen: ChosenDate, drivePath: String, hash: String) {
+        val entry = ManifestFileEntry(
+            hash = hash,
+            drivePath = drivePath,
+            size = file.sizeBytes,
+            originalFilename = file.name,
+            originalFilenames = listOf(file.name),
+            kind = file.kind.wireName(),
+            chosenDate = chosen.localDate,
+            sourceTag = chosen.sourceTag,
+        )
+        manifest.appendStored(entry)
+        committed += entry
     }
 
     private fun copyToFinal(
         file: MediaFile,
         chosen: ChosenDate,
         finalPath: String,
-        partPath: String,
+        source: HashedBytes,
     ): FileBackupResult {
-        val copied = writeVerifiedPart(file, partPath) ?: return attention(file)
+        val partPath = "$finalPath$PART_SUFFIX"
+        val copied = writeVerifiedPart(file, partPath, source) ?: return attention(file, copiedFile = true)
         when (archiveDrive.rename(partPath, finalPath)) {
             RenameResult.Renamed -> Unit
             is RenameResult.Collision -> {
                 archiveDrive.delete(partPath)
-                return attention(file)
+                return attention(file, copiedFile = true)
             }
         }
-        commit(file, chosen, finalPath, copied.sha256)
-        return committedResult(file, wroteManifestLine = true)
+        storeNew(file, chosen, finalPath, copied.sha256)
+        return FileBackupResult(
+            outcome = BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
+            wroteNewFileLine = true,
+            copiedFile = true,
+            deferredByCap = false,
+            hash = copied.sha256,
+        )
     }
 
     private fun displaceUnproven(
         file: MediaFile,
         chosen: ChosenDate,
         finalPath: String,
-        partPath: String,
+        source: HashedBytes,
     ): FileBackupResult {
-        val copied = writeVerifiedPart(file, partPath) ?: return attention(file)
+        val partPath = "$finalPath$PART_SUFFIX"
+        val copied = writeVerifiedPart(file, partPath, source) ?: return attention(file, copiedFile = true)
         val aside = unusedAside(finalPath)
         if (aside == null) {
             archiveDrive.delete(partPath)
-            return attention(file)
+            return attention(file, copiedFile = true)
         }
-        // Keep the mismatching file. Move it aside, then put the verified part in its place.
         when (archiveDrive.rename(finalPath, aside)) {
             RenameResult.Renamed -> Unit
             is RenameResult.Collision -> {
                 archiveDrive.delete(partPath)
-                return attention(file)
+                return attention(file, copiedFile = true)
             }
         }
         when (archiveDrive.rename(partPath, finalPath)) {
             RenameResult.Renamed -> Unit
             is RenameResult.Collision -> {
                 archiveDrive.delete(partPath)
-                return attention(file)
+                return attention(file, copiedFile = true)
             }
         }
-        commit(file, chosen, finalPath, copied.sha256)
-        return committedResult(file, wroteManifestLine = true)
+        storeNew(file, chosen, finalPath, copied.sha256)
+        return FileBackupResult(
+            outcome = BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
+            wroteNewFileLine = true,
+            copiedFile = true,
+            deferredByCap = false,
+            hash = copied.sha256,
+        )
     }
 
-    private fun writeVerifiedPart(file: MediaFile, partPath: String): HashedBytes? {
+    private fun writeVerifiedPart(file: MediaFile, partPath: String, expected: HashedBytes): HashedBytes? {
         if (archiveDrive.exists(partPath)) {
             archiveDrive.delete(partPath)
         }
@@ -134,7 +212,8 @@ internal class OriginalCopier(
         val readBack = archiveDrive.read(partPath).use { input ->
             copyHashed(input, OutputStream.nullOutputStream())
         }
-        val matches = copied.sha256 == readBack.sha256 &&
+        val matches = copied.sha256 == expected.sha256 &&
+            readBack.sha256 == expected.sha256 &&
             copied.byteCount == file.sizeBytes &&
             readBack.byteCount == file.sizeBytes &&
             archiveDrive.byteCount(partPath) == file.sizeBytes
@@ -145,6 +224,19 @@ internal class OriginalCopier(
         return copied
     }
 
+    private fun hashSource(file: MediaFile): HashedBytes {
+        return mediaSource.openOriginal(file.id).use { input ->
+            copyHashed(input, OutputStream.nullOutputStream())
+        }
+    }
+
+    private fun deletePart(finalPath: String) {
+        val partPath = "$finalPath$PART_SUFFIX"
+        if (archiveDrive.exists(partPath)) {
+            archiveDrive.delete(partPath)
+        }
+    }
+
     private fun unusedAside(finalPath: String): String? {
         for (n in 1..999) {
             val candidate = "$finalPath.photoxpo-unproven-$n"
@@ -153,32 +245,32 @@ internal class OriginalCopier(
         return null
     }
 
-    private fun commit(file: MediaFile, chosen: ChosenDate, drivePath: String, hash: String) {
-        onCommit(file, chosen, drivePath, hash)
-        committed += ManifestFileEntry(
+    private fun backedUp(file: MediaFile, hash: String): FileBackupResult {
+        return FileBackupResult(
+            outcome = BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
+            wroteNewFileLine = false,
+            copiedFile = false,
+            deferredByCap = false,
             hash = hash,
-            drivePath = drivePath,
-            size = file.sizeBytes,
-            originalFilename = file.name,
-            kind = file.kind.wireName(),
-            chosenDate = chosen.localDate,
-            sourceTag = chosen.sourceTag,
         )
     }
 
-    private fun committedResult(file: MediaFile, wroteManifestLine: Boolean): FileBackupResult {
+    private fun attention(file: MediaFile, copiedFile: Boolean = false): FileBackupResult {
         return FileBackupResult(
-            BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
-            wroteManifestLine = wroteManifestLine,
+            outcome = BackupItemOutcome(file.id, file.name, ItemState.NEEDS_ATTENTION),
+            wroteNewFileLine = false,
+            copiedFile = copiedFile,
+            deferredByCap = false,
+            hash = null,
         )
     }
+}
 
-    private fun attention(file: MediaFile): FileBackupResult {
-        return FileBackupResult(
-            BackupItemOutcome(file.id, file.name, ItemState.NEEDS_ATTENTION),
-            wroteManifestLine = false,
-        )
-    }
+internal fun fileNameWithShortHash(filename: String, sha256: String): String {
+    val prefix = sha256.substring(0, 8)
+    val dot = filename.lastIndexOf('.')
+    if (dot <= 0) return "$filename-$prefix"
+    return filename.substring(0, dot) + "-" + prefix + filename.substring(dot)
 }
 
 private data class HashedBytes(val sha256: String, val byteCount: Long)

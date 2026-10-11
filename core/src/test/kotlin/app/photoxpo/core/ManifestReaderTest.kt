@@ -72,6 +72,7 @@ class ManifestReaderTest {
         assertEquals("photo", entry.kind)
         assertEquals("2020-01-31", entry.chosenDate)
         assertEquals("modified", entry.sourceTag)
+        assertEquals(listOf("a.jpg"), entry.originalFilenames)
     }
 
     @Test
@@ -94,6 +95,19 @@ class ManifestReaderTest {
         val contents = ManifestReader().read(text)
         assertTrue(contents.entries.isEmpty())
         assertTrue(contents.interrupted)
+    }
+
+    @Test
+    fun originalFilenamesArray_listsEverySourceName() {
+        val json = "{\"type\":\"file\",\"hash\":\"ab\",\"drivePath\":\"p\",\"size\":2," +
+            "\"kind\":\"photo\",\"chosenDate\":\"2020-01-02\",\"sourceTag\":\"modified\"," +
+            "\"originalFilename\":\"a.jpg\",\"originalFilenames\":[\"a.jpg\",\"b.jpg\"]," +
+            "\"previewFileName\":null}\n"
+        val entry = ManifestReader().read(json).entries.single()
+        assertEquals("a.jpg", entry.originalFilename)
+        assertEquals(listOf("a.jpg", "b.jpg"), entry.originalFilenames)
+        assertEquals("ab", entry.hash)
+        assertEquals("p", entry.drivePath)
     }
 
     @Test
@@ -142,6 +156,7 @@ class ManifestReaderTest {
         assertEquals("Photoxpo/Originals/2020/2020-01/IMG_0001.jpg", entry.drivePath)
         assertEquals(5L, entry.size)
         assertEquals("IMG_0001.jpg", entry.originalFilename)
+        assertEquals(listOf("IMG_0001.jpg"), entry.originalFilenames)
         assertEquals("photo", entry.kind)
         assertEquals("2020-01-31", entry.chosenDate)
         assertEquals("modified", entry.sourceTag)
