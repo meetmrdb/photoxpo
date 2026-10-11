@@ -40,6 +40,15 @@ class FakeArchiveDrive(
     var writeCalls: Int = 0
         private set
 
+    /** When true, [exists], [byteCount], and [read] throw [DriveUnavailableException]. */
+    var unavailable: Boolean = false
+
+    /**
+     * When set, [read] throws [DriveUnavailableException] after this many bytes
+     * if the Archive Drive file still has more.
+     */
+    var unavailableAfterBytes: Long? = null
+
     override fun create(path: String): CreateResult {
         val target = resolve(path)
         if (Files.exists(target)) return CreateResult.Collision(path)
@@ -64,14 +73,18 @@ class FakeArchiveDrive(
     }
 
     override fun read(path: String): InputStream {
+        if (unavailable) throw DriveUnavailableException("Archive Drive is absent")
         var input: InputStream = Files.newInputStream(resolve(path))
         if (corruptReadBack) input = FirstByteFlippingInputStream(input)
+        val afterBytes = unavailableAfterBytes
+        if (afterBytes != null) input = UnavailableAfterBytesInputStream(input, afterBytes)
         if (!isPart(path)) return input
         val fault = take(DriveFaultStep.MID_READ_BACK) ?: return input
         return FaultingInputStream(input, fault)
     }
 
     override fun byteCount(path: String): Long {
+        if (unavailable) throw DriveUnavailableException("Archive Drive is absent")
         val actual = Files.size(resolve(path))
         return if (wrongByteCount) actual + 1 else actual
     }
@@ -91,7 +104,10 @@ class FakeArchiveDrive(
         return RenameResult.Renamed
     }
 
-    override fun exists(path: String): Boolean = Files.exists(resolve(path))
+    override fun exists(path: String): Boolean {
+        if (unavailable) throw DriveUnavailableException("Archive Drive is absent")
+        return Files.exists(resolve(path))
+    }
 
     override fun list(directory: String): List<String> {
         val dir = resolve(directory)
@@ -216,6 +232,37 @@ private class FaultingInputStream(
         val n = delegate.read(buffer, off, cap)
         if (n > 0) seen += n
         if (seen >= fault.afterBytes) throw fault.error
+        return n
+    }
+
+    override fun close() {
+        delegate.close()
+    }
+}
+
+private class UnavailableAfterBytesInputStream(
+    private val delegate: InputStream,
+    private val afterBytes: Long,
+) : InputStream() {
+    private var seen = 0L
+
+    override fun read(): Int {
+        val one = ByteArray(1)
+        val n = read(one, 0, 1)
+        if (n < 0) return -1
+        return one[0].toInt() and 0xff
+    }
+
+    override fun read(buffer: ByteArray, off: Int, len: Int): Int {
+        if (len == 0) return 0
+        if (seen >= afterBytes) {
+            val peek = delegate.read()
+            if (peek < 0) return -1
+            throw DriveUnavailableException("Archive Drive is absent")
+        }
+        val room = (afterBytes - seen).coerceAtMost(len.toLong()).toInt()
+        val n = delegate.read(buffer, off, room)
+        if (n > 0) seen += n
         return n
     }
 

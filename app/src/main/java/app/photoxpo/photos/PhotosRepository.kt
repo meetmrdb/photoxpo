@@ -35,6 +35,13 @@ class PhotosRepository(
 
     fun photo(hash: String): Flow<PhotoEntity?> = dao.observeByHash(hash)
 
+    /** Records that this Original is on the phone after Load. */
+    suspend fun markOriginalOnPhone(hash: String) {
+        val current = dao.get(hash) ?: return
+        if (current.originalOnPhone) return
+        dao.upsert(listOf(current.copy(originalOnPhone = true)))
+    }
+
     /**
      * Reads Manifests on [archiveDrive] and stores those Originals.
      * The drive wins for name, date, size, kind, source tag, and drive path.
