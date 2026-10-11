@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PROTOTYPE: throwaway device spike, ticket #12. Wipe me. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="spike.photoxpo">
+    <uses-sdk android:minSdkVersion="34" android:targetSdkVersion="35"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <application android:label="Photoxpo Spike" android:allowBackup="false">
+        <activity android:name="spike.MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <service android:name="spike.CopyService" android:exported="false"
+            android:foregroundServiceType="connectedDevice"/>
+        <service android:name="spike.CopyServiceDataSync" android:exported="false"
+            android:foregroundServiceType="dataSync"/>
+    </application>
+</manifest>
