@@ -263,7 +263,6 @@ class OnboardingViewModel(
                     QualityCardState(
                         preview = PreviewJpeg(jpeg),
                         projectedBytes = projectedTotalBytes(
-                            sampleOriginalBytes = originalSize,
                             samplePreviewBytes = jpeg.size.toLong(),
                             libraryCount = librarySize,
                         ),

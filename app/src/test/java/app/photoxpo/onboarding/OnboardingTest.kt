@@ -97,20 +97,18 @@ class OnboardingTest {
     }
 
     @Test
-    fun projectedTotalBytes_scalesOneSampleByTheLibraryCount() {
-        assertEquals(0L, projectedTotalBytes(0L, 0L, 10))
-        assertEquals(30L, projectedTotalBytes(7L, 3L, 3))
-        assertEquals(0L, projectedTotalBytes(-5L, -8L, 4))
-        assertEquals(20L, projectedTotalBytes(-5L, 10L, 2))
-        assertEquals(0L, projectedTotalBytes(10L, 10L, -3))
-        assertEquals(0L, projectedTotalBytes(Long.MIN_VALUE, Long.MIN_VALUE, Int.MIN_VALUE))
+    fun projectedTotalBytes_scalesOnePreviewByTheLibraryCount() {
+        assertEquals(0L, projectedTotalBytes(0L, 10))
+        assertEquals(9L, projectedTotalBytes(3L, 3))
+        assertEquals(0L, projectedTotalBytes(-8L, 4))
+        assertEquals(0L, projectedTotalBytes(10L, -3))
+        assertEquals(0L, projectedTotalBytes(Long.MIN_VALUE, Int.MIN_VALUE))
     }
 
     @Test
     fun projectedTotalBytes_saturatesAtLongMax() {
-        assertEquals(Long.MAX_VALUE, projectedTotalBytes(Long.MAX_VALUE, 1L, 1))
-        assertEquals(Long.MAX_VALUE, projectedTotalBytes(Long.MAX_VALUE, 0L, 2))
-        assertEquals(Long.MAX_VALUE, projectedTotalBytes(Long.MAX_VALUE / 2 + 1, 0L, 3))
+        assertEquals(Long.MAX_VALUE, projectedTotalBytes(Long.MAX_VALUE, 2))
+        assertEquals(Long.MAX_VALUE, projectedTotalBytes(Long.MAX_VALUE / 2 + 1, 3))
     }
 
     @Test
