@@ -4,10 +4,11 @@ import android.content.Context
 import android.net.Uri
 import app.photoxpo.core.BackedUpLedger
 import app.photoxpo.core.DriveIdentityStore
+import app.photoxpo.core.PreviewPreset
 
 /**
  * Phone-side memory for the Archive Drive: expected drive id, Backed up hashes,
- * last Backed up time, chosen tree, and file cap.
+ * last Backed up time, chosen tree, file cap, onboarding, and Preview preset.
  */
 class BackupSettingsStore(
     context: Context,
@@ -23,6 +24,25 @@ class BackupSettingsStore(
     fun setFileCap(fileCap: Int) {
         val stored = if (fileCap < 1) DEFAULT_FILE_CAP else fileCap
         settings.edit().putInt(KEY_FILE_CAP, stored).commit()
+    }
+
+    fun onboardingDone(): Boolean = settings.getBoolean(KEY_ONBOARDING_DONE, false)
+
+    fun setOnboardingDone(done: Boolean) {
+        settings.edit().putBoolean(KEY_ONBOARDING_DONE, done).commit()
+    }
+
+    fun previewPreset(): PreviewPreset {
+        val stored = settings.getString(KEY_PREVIEW_PRESET, null) ?: return PreviewPreset.BALANCED
+        return try {
+            PreviewPreset.valueOf(stored)
+        } catch (_: IllegalArgumentException) {
+            PreviewPreset.BALANCED
+        }
+    }
+
+    fun setPreviewPreset(preset: PreviewPreset) {
+        settings.edit().putString(KEY_PREVIEW_PRESET, preset.name).commit()
     }
 
     fun treeUri(): Uri? {
@@ -67,5 +87,7 @@ class BackupSettingsStore(
         const val KEY_DRIVE_ID = "expectedDriveId"
         const val KEY_TREE_URI = "treeUri"
         const val KEY_FILE_CAP = "fileCap"
+        const val KEY_ONBOARDING_DONE = "onboardingDone"
+        const val KEY_PREVIEW_PRESET = "previewPreset"
     }
 }
