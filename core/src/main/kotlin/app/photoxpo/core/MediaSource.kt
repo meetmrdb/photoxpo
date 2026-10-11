@@ -13,6 +13,9 @@ data class MediaFile(
     val sizeBytes: Long,
     val modifiedAtEpochMillis: Long,
     val kind: MediaKind,
+    val exifDateTimeOriginal: String? = null,
+    val dateTakenEpochMillis: Long? = null,
+    val videoMetadataUtcEpochMillis: Long? = null,
 )
 
 interface MediaSource {
