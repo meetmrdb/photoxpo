@@ -4,18 +4,45 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import app.photoxpo.history.BackupRunDao
+import app.photoxpo.history.BackupRunEntity
 
 @Database(
-    entities = [PhotoEntity::class],
-    version = 1,
+    entities = [PhotoEntity::class, BackupRunEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class PhotosDatabase : RoomDatabase() {
     abstract fun photoDao(): PhotoDao
 
+    abstract fun backupRunDao(): BackupRunDao
+
     companion object {
         @Volatile
         private var instance: PhotosDatabase? = null
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `backup_runs` (
+                        `runFile` TEXT NOT NULL,
+                        `startedAt` TEXT NOT NULL,
+                        `endedAt` TEXT,
+                        `fileCount` INTEGER NOT NULL,
+                        `bytes` INTEGER NOT NULL,
+                        `checked` INTEGER NOT NULL,
+                        `elapsedMs` INTEGER,
+                        `mbPerSecond` REAL,
+                        `interrupted` INTEGER NOT NULL,
+                        PRIMARY KEY(`runFile`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
 
         fun get(context: Context): PhotosDatabase {
             instance?.let { return it }
@@ -24,7 +51,9 @@ abstract class PhotosDatabase : RoomDatabase() {
                     context.applicationContext,
                     PhotosDatabase::class.java,
                     "photos.db",
-                ).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { instance = it }
             }
         }
     }
