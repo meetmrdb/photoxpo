@@ -1,0 +1,121 @@
+package app.photoxpo.home
+
+import app.photoxpo.backup.BackupStatus
+import app.photoxpo.backup.BackupUiState
+import app.photoxpo.backup.PauseReason
+import app.photoxpo.backup.backupProgressText
+import app.photoxpo.data.DriveStatus
+
+data class HomeOfflineBanner(
+    val message: String,
+    val lastBackedUpLine: String,
+)
+
+data class HomeUiModel(
+    val statusSentence: String,
+    val primaryLabel: String,
+    val primaryPauses: Boolean,
+    val progressText: String,
+    val progressFraction: Float?,
+    val lastBackedUpLine: String,
+    val offlineBanner: HomeOfflineBanner?,
+    val showDriveMismatch: Boolean,
+)
+
+fun homeUiModel(
+    state: BackupUiState,
+    nowEpochMillis: Long,
+): HomeUiModel {
+    val lastBackedUpLine = lastBackedUpLine(state.lastBackedUpAtEpochMillis, nowEpochMillis)
+    return HomeUiModel(
+        statusSentence = statusSentence(state),
+        primaryLabel = primaryLabel(state),
+        primaryPauses = state.status == BackupStatus.Running,
+        progressText = backupProgressText(state),
+        progressFraction = progressFraction(state),
+        lastBackedUpLine = lastBackedUpLine,
+        offlineBanner = offlineBanner(state, lastBackedUpLine),
+        showDriveMismatch = state.status == BackupStatus.DriveMismatch,
+    )
+}
+
+private fun statusSentence(state: BackupUiState): String {
+    return when (val status = state.status) {
+        BackupStatus.Idle,
+        BackupStatus.Done,
+        -> backedUpSentence(state.backedUpCount)
+        BackupStatus.Running -> "Backing up your photos"
+        is BackupStatus.Paused -> when (status.reason) {
+            PauseReason.User -> "Backup run paused"
+            PauseReason.DriveOut -> "Your Archive Drive is not connected"
+        }
+        BackupStatus.DriveMismatch ->
+            "This Archive Drive is not the one this phone remembers"
+        BackupStatus.NeedsAttention -> "An Original needs attention"
+    }
+}
+
+private fun backedUpSentence(count: Int): String {
+    return when (count) {
+        0 -> "No photos backed up yet"
+        1 -> "1 photo backed up"
+        else -> "$count photos backed up"
+    }
+}
+
+private fun primaryLabel(state: BackupUiState): String {
+    if (state.status == BackupStatus.Running) return "Pause"
+    val more = state.status == BackupStatus.Done
+    return startLabel(state.fileCap, more)
+}
+
+private fun startLabel(fileCap: Int, more: Boolean): String {
+    val files = if (fileCap == 1) "file" else "files"
+    return if (more) {
+        "Back up $fileCap more $files"
+    } else {
+        "Back up $fileCap $files"
+    }
+}
+
+private fun progressFraction(state: BackupUiState): Float? {
+    if (state.totalCount <= 0) return null
+    return (state.backedUpCount.toFloat() / state.totalCount.toFloat()).coerceIn(0f, 1f)
+}
+
+private fun offlineBanner(state: BackupUiState, lastBackedUpLine: String): HomeOfflineBanner? {
+    val message = when (state.driveStatus) {
+        DriveStatus.Ready -> return null
+        DriveStatus.Absent -> "Your Archive Drive is not connected"
+        DriveStatus.ReadOnly -> "Photoxpo cannot copy onto this Archive Drive"
+    }
+    return HomeOfflineBanner(
+        message = message,
+        lastBackedUpLine = lastBackedUpLine,
+    )
+}
+
+private fun lastBackedUpLine(lastEpochMillis: Long?, nowEpochMillis: Long): String {
+    return "Last backed up ${relativeTime(lastEpochMillis, nowEpochMillis)}"
+}
+
+private fun relativeTime(lastEpochMillis: Long?, nowEpochMillis: Long): String {
+    if (lastEpochMillis == null) return "never"
+    val elapsed = nowEpochMillis - lastEpochMillis
+    if (elapsed < MINUTE_MS) return "just now"
+    val minutes = elapsed / MINUTE_MS
+    if (minutes < 60) {
+        return if (minutes == 1L) "1 minute ago" else "$minutes minutes ago"
+    }
+    val hours = elapsed / HOUR_MS
+    if (hours < 24) {
+        return if (hours == 1L) "1 hour ago" else "$hours hours ago"
+    }
+    val days = elapsed / DAY_MS
+    if (days == 1L) return "yesterday"
+    return "$days days ago"
+}
+
+private const val MINUTE_MS = 60_000L
+private const val HOUR_MS = 60L * MINUTE_MS
+private const val DAY_MS = 24L * HOUR_MS

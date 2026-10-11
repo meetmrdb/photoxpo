@@ -135,6 +135,30 @@ class BackupController private constructor(
         }
     }
 
+    /** Probes the chosen Archive Drive now, for example after the person picks a folder. */
+    fun refreshDrive() = onVolumesChanged()
+
+    /**
+     * The person confirmed "Use this drive instead". The drive wins: Backed up is cleared on every
+     * item, Previews are kept and marked as not on this drive, and a new drive id starts.
+     */
+    fun useThisDriveInstead() {
+        scope.launch {
+            val uri = settings.treeUri() ?: return@launch
+            withContext(Dispatchers.IO) {
+                BackupRunner(
+                    mediaSource = MediaStoreSource(appContext),
+                    archiveDrive = SafArchiveDrive(appContext, uri),
+                    driveIdentity = settings,
+                    backedUpLedger = progressLedger(AtomicInteger(0)),
+                    previewPreset = settings.previewPreset(),
+                ).useThisDriveInstead()
+            }
+            _state.update { it.copy(status = BackupStatus.Idle, backedUpCount = 0, message = null) }
+            onVolumesChanged()
+        }
+    }
+
     internal fun onVolumesChanged() {
         scope.launch {
             val uri = settings.treeUri() ?: return@launch
