@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Signature permission. Declared so the test can attempt adoptShellPermissionIdentity.
+         The provider does not require it. The instrumentation process cannot be granted it. -->
+    <uses-permission android:name="android.permission.MANAGE_DOCUMENTS" />
+
+    <application>
+        <provider
+            android:name="app.photoxpo.data.TestArchiveDocumentsProvider"
+            android:authorities="app.photoxpo.test.archive"
+            android:exported="true"
+            android:grantUriPermissions="true">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+    </application>
+</manifest>

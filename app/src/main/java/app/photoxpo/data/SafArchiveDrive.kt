@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import app.photoxpo.core.ArchiveDrive
 import app.photoxpo.core.CreateResult
+import app.photoxpo.core.DriveUnavailableException
 import app.photoxpo.core.RenameResult
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -32,17 +33,19 @@ class SafArchiveDrive(
             if (findChild(parent.documentId, name) != null) {
                 return@synchronized CreateResult.Collision(path)
             }
-            val created = DocumentsContract.createDocument(
-                resolver,
-                documentUri(parent.documentId),
-                OCTET_STREAM,
-                name,
-            ) ?: throw IOException("Could not create $path on the Archive Drive")
+            val created = onDrive {
+                DocumentsContract.createDocument(
+                    resolver,
+                    documentUri(parent.documentId),
+                    OCTET_STREAM,
+                    name,
+                )
+            } ?: throw IOException("Could not create $path on the Archive Drive")
             val newId = DocumentsContract.getDocumentId(created)
             val actual = displayName(newId)
                 ?: throw IOException("Archive Drive did not return a name for $path")
             if (actual != name) {
-                if (!DocumentsContract.deleteDocument(resolver, documentUri(newId))) {
+                if (!onDrive { DocumentsContract.deleteDocument(resolver, documentUri(newId)) }) {
                     throw IOException("Archive Drive created $actual instead of $name")
                 }
                 return@synchronized CreateResult.Collision(path)
@@ -54,19 +57,22 @@ class SafArchiveDrive(
 
     override fun write(path: String): OutputStream {
         val uri = synchronized(gate) { documentUri(requireDoc(path).documentId) }
-        val pfd = resolver.openFileDescriptor(uri, "wt") ?: throw FileNotFoundException(path)
+        val pfd = onDrive { resolver.openFileDescriptor(uri, "wt") }
+            ?: throw DriveUnavailableException("Archive Drive is absent")
         return SyncingOutputStream(pfd)
     }
 
     override fun read(path: String): InputStream {
         val uri = synchronized(gate) { documentUri(requireDoc(path).documentId) }
-        val pfd = resolver.openFileDescriptor(uri, "r") ?: throw FileNotFoundException(path)
+        val pfd = onDrive { resolver.openFileDescriptor(uri, "r") }
+            ?: throw DriveUnavailableException("Archive Drive is absent")
         return ParcelFileDescriptor.AutoCloseInputStream(pfd)
     }
 
     override fun byteCount(path: String): Long {
         val uri = synchronized(gate) { documentUri(requireDoc(path).documentId) }
-        val pfd = resolver.openFileDescriptor(uri, "r") ?: throw FileNotFoundException(path)
+        val pfd = onDrive { resolver.openFileDescriptor(uri, "r") }
+            ?: throw DriveUnavailableException("Archive Drive is absent")
         pfd.use { descriptor ->
             val size = descriptor.statSize
             if (size < 0) throw IOException("Archive Drive did not report a size for $path")
@@ -133,7 +139,7 @@ class SafArchiveDrive(
             val doc = documentAt(segments) ?: return
             val key = archivePathKey(segments)
             invalidate(key)
-            if (!DocumentsContract.deleteDocument(resolver, documentUri(doc.documentId))) {
+            if (!onDrive { DocumentsContract.deleteDocument(resolver, documentUri(doc.documentId)) }) {
                 throw IOException("Could not delete $path on the Archive Drive")
             }
         }
@@ -189,17 +195,19 @@ class SafArchiveDrive(
             }
             val child = findChild(parent.documentId, segment)
             if (child == null) {
-                val created = DocumentsContract.createDocument(
-                    resolver,
-                    documentUri(parent.documentId),
-                    DocumentsContract.Document.MIME_TYPE_DIR,
-                    segment,
-                ) ?: throw IOException("Could not create directory $key on the Archive Drive")
+                val created = onDrive {
+                    DocumentsContract.createDocument(
+                        resolver,
+                        documentUri(parent.documentId),
+                        DocumentsContract.Document.MIME_TYPE_DIR,
+                        segment,
+                    )
+                } ?: throw IOException("Could not create directory $key on the Archive Drive")
                 val newId = DocumentsContract.getDocumentId(created)
                 val actual = displayName(newId)
                     ?: throw IOException("Archive Drive did not return a name for $key")
                 if (actual != segment) {
-                    DocumentsContract.deleteDocument(resolver, documentUri(newId))
+                    onDrive { DocumentsContract.deleteDocument(resolver, documentUri(newId)) }
                     throw IOException("Archive Drive created directory $actual instead of $segment")
                 }
                 val doc = Doc(newId, directory = true)
@@ -218,13 +226,16 @@ class SafArchiveDrive(
     }
 
     private fun renameOrNull(documentId: String, fromName: String, toName: String): String? {
-        val renamed = DocumentsContract.renameDocument(resolver, documentUri(documentId), toName)
-            ?: throw IOException("Rename failed on the Archive Drive")
+        val renamed = onDrive {
+            DocumentsContract.renameDocument(resolver, documentUri(documentId), toName)
+        } ?: throw IOException("Rename failed on the Archive Drive")
         val newId = DocumentsContract.getDocumentId(renamed)
         val actual = displayName(newId)
             ?: throw IOException("Archive Drive did not return a name after rename")
         if (actual == toName) return newId
-        val restored = DocumentsContract.renameDocument(resolver, documentUri(newId), fromName)
+        val restored = onDrive {
+            DocumentsContract.renameDocument(resolver, documentUri(newId), fromName)
+        }
         if (restored == null || displayName(DocumentsContract.getDocumentId(restored)) != fromName) {
             throw IOException("Archive Drive renamed $fromName to $actual")
         }
@@ -244,12 +255,14 @@ class SafArchiveDrive(
             documentAt(sourceParentSegments)?.documentId
                 ?: throw FileNotFoundException(archivePathKey(fromSegments))
         }
-        val moved = DocumentsContract.moveDocument(
-            resolver,
-            documentUri(sourceId),
-            documentUri(sourceParentId),
-            documentUri(targetParentId),
-        ) ?: throw IOException("Move failed on the Archive Drive")
+        val moved = onDrive {
+            DocumentsContract.moveDocument(
+                resolver,
+                documentUri(sourceId),
+                documentUri(sourceParentId),
+                documentUri(targetParentId),
+            )
+        } ?: throw IOException("Move failed on the Archive Drive")
         val movedId = DocumentsContract.getDocumentId(moved)
         if (fromSegments.last() == toSegments.last()) return movedId
         return renameOrNull(movedId, fromSegments.last(), toSegments.last())
@@ -261,8 +274,9 @@ class SafArchiveDrive(
 
     private fun children(parentId: String): List<Child> {
         val uri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
-        val cursor = resolver.query(uri, CHILD_COLUMNS, null, null, null)
-            ?: throw IOException("Archive Drive is absent")
+        val cursor = onDrive {
+            resolver.query(uri, CHILD_COLUMNS, null, null, null)
+        } ?: throw DriveUnavailableException("Archive Drive is absent")
         val rows = ArrayList<Child>()
         cursor.use { result ->
             val idCol = result.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
@@ -282,13 +296,15 @@ class SafArchiveDrive(
     }
 
     private fun displayName(documentId: String): String? {
-        val cursor = resolver.query(
-            documentUri(documentId),
-            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
-            null,
-            null,
-            null,
-        ) ?: return null
+        val cursor = onDrive {
+            resolver.query(
+                documentUri(documentId),
+                arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )
+        } ?: return null
         cursor.use { result ->
             if (!result.moveToFirst() || result.isNull(0)) return null
             return result.getString(0)
@@ -315,6 +331,22 @@ class SafArchiveDrive(
 
     private fun documentUri(documentId: String): Uri {
         return DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+    }
+
+    /**
+     * A ContentResolver failure on a Uri that already resolved means the Archive Drive is absent.
+     * [requireDoc] still throws [FileNotFoundException] when the path is not on the drive.
+     */
+    private fun <T> onDrive(block: () -> T): T {
+        try {
+            return block()
+        } catch (e: FileNotFoundException) {
+            throw DriveUnavailableException("Archive Drive is absent", e)
+        } catch (e: IllegalArgumentException) {
+            throw DriveUnavailableException("Archive Drive is absent", e)
+        } catch (e: SecurityException) {
+            throw DriveUnavailableException("Archive Drive is absent", e)
+        }
     }
 
     private data class Doc(
