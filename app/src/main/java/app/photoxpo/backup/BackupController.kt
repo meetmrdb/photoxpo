@@ -50,6 +50,8 @@ class BackupController private constructor(
 
     private val _state = MutableStateFlow(
         BackupUiState(
+            // The phone's cache of Backed up Originals survives a restart; the drive stays the truth.
+            backedUpCount = settings.ledgerEntries().size,
             lastBackedUpAtEpochMillis = settings.lastBackedUpAtEpochMillis(),
             fileCap = settings.fileCap(),
         ),
