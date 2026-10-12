@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.PowerManager
+import android.os.storage.StorageManager
+import android.os.storage.StorageVolume
 import androidx.core.content.ContextCompat
 import app.photoxpo.core.BackupRunResult
 import app.photoxpo.core.BackupRunStatus
@@ -70,6 +72,19 @@ class BackupController private constructor(
         ),
     )
     val state: StateFlow<BackupUiState> = _state.asStateFlow()
+
+    init {
+        // The foreground service only watches the drive during a run. Home must notice a cable
+        // going in or out while the app is simply open.
+        appContext.getSystemService(StorageManager::class.java)?.registerStorageVolumeCallback(
+            appContext.mainExecutor,
+            object : StorageManager.StorageVolumeCallback() {
+                override fun onStateChanged(volume: StorageVolume) {
+                    onVolumesChanged()
+                }
+            },
+        )
+    }
 
     fun start(fileCap: Int = settings.fileCap()) {
         val cap = if (fileCap < 1) DEFAULT_FILE_CAP else fileCap
