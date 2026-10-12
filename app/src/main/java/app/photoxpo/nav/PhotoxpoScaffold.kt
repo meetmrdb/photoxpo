@@ -125,7 +125,7 @@ fun PhotoxpoScaffold(
             }
         }
     }
-    }
+}
 
 private const val WIDE_WINDOW_DP = 600
 
