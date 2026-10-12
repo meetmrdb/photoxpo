@@ -132,6 +132,13 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                model.paceLine?.let { pace ->
+                    Text(
+                        text = pace,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Progress(model)
             Row(
@@ -153,6 +160,13 @@ fun HomeScreen(
                     model.lastBackedUpDate?.let { date ->
                         Text(
                             text = date,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    model.lastRunLine?.let { took ->
+                        Text(
+                            text = took,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

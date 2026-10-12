@@ -103,12 +103,21 @@ data class BackupUiState(
     val sessionAccess: SessionAccess? = null,
     val driveFreeBytes: Long? = null,
     val bytesToCopy: Long? = null,
+    /** When this run began, and what it had to copy then, so Home can say how long and how much is left. */
+    val runStartedAtMillis: Long? = null,
+    val runBytesToCopy: Long = 0L,
+    val runBytesCopied: Long = 0L,
+    val firstCopyAtMillis: Long? = null,
+    val firstCopyBytes: Long = 0L,
+    val lastRunTookMillis: Long? = null,
 )
 
 fun BackupUiState.runStarted(
     totalCount: Int,
     fileCap: Int,
     driveStatus: DriveStatus,
+    bytesToCopy: Long = 0L,
+    nowEpochMillis: Long = System.currentTimeMillis(),
 ): BackupUiState {
     val kept = if (message == MESSAGE_CONNECTED_DEVICE_FALLBACK) message else null
     return copy(
@@ -118,6 +127,22 @@ fun BackupUiState.runStarted(
         fileCap = fileCap,
         driveStatus = driveStatus,
         message = kept,
+        runStartedAtMillis = nowEpochMillis,
+        runBytesToCopy = bytesToCopy,
+        runBytesCopied = 0L,
+        firstCopyAtMillis = null,
+        firstCopyBytes = 0L,
+    )
+}
+
+/** One more Original was newly copied during this run. */
+fun BackupUiState.withCopied(sizeBytes: Long, nowEpochMillis: Long): BackupUiState {
+    if (status !is BackupStatus.Running) return this
+    val first = firstCopyAtMillis == null
+    return copy(
+        runBytesCopied = runBytesCopied + sizeBytes,
+        firstCopyAtMillis = firstCopyAtMillis ?: nowEpochMillis,
+        firstCopyBytes = if (first) sizeBytes else firstCopyBytes,
     )
 }
 

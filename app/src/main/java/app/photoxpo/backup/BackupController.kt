@@ -178,9 +178,18 @@ class BackupController private constructor(
             val cap = settings.fileCap()
             runJob = scope.launch {
                 settings.setRunActive(true)
+                // Free space on the drive shifts as files land; keep Home's number fresh during a long run.
+                val spaceTicker = launch {
+                    refreshSpace()
+                    while (true) {
+                        delay(SPACE_REFRESH_MS)
+                        refreshSpace()
+                    }
+                }
                 try {
                     executeRun(uri, cap)
                 } finally {
+                    spaceTicker.cancel()
                     settings.setRunActive(false)
                 }
                 refreshSpace()
@@ -271,14 +280,18 @@ class BackupController private constructor(
             finishAbandoned()
             return
         }
-        val total = withContext(Dispatchers.IO) {
+        val camera = withContext(Dispatchers.IO) {
             try {
-                MediaStoreSource(appContext).listCameraFolder().size
+                MediaStoreSource(appContext).listCameraFolder()
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
-                _state.value.totalCount
+                emptyList()
             }
         }
+        val total = if (camera.isEmpty()) _state.value.totalCount else camera.size
+        val sizeById = camera.associate { it.id to it.sizeBytes }
+        val ledgerKeys = settings.ledgerEntries().keys
+        val bytesToCopy = camera.filter { it.id !in ledgerKeys }.sumOf { it.sizeBytes }
         if (shouldAbandon()) {
             finishAbandoned()
             return
@@ -286,8 +299,12 @@ class BackupController private constructor(
         val alreadyBackedUp = backedUpOnThisPhone()
         val recorded = AtomicInteger(alreadyBackedUp)
         _state.update {
-            it.runStarted(totalCount = total, fileCap = cap, driveStatus = it.driveStatus)
-                .copy(backedUpCount = alreadyBackedUp)
+            it.runStarted(
+                totalCount = total,
+                fileCap = cap,
+                driveStatus = it.driveStatus,
+                bytesToCopy = bytesToCopy,
+            ).copy(backedUpCount = alreadyBackedUp)
         }
         val outcome = try {
             withContext(Dispatchers.IO) {
@@ -297,7 +314,7 @@ class BackupController private constructor(
                         mediaSource = MediaStoreSource(appContext),
                         archiveDrive = SafArchiveDrive(appContext, uri),
                         driveIdentity = settings,
-                        backedUpLedger = progressLedger(recorded),
+                        backedUpLedger = progressLedger(recorded, sizeById),
                         fileCap = cap,
                         previewPreset = settings.previewPreset(),
                         isCancelled = { cancel.get() },
@@ -354,7 +371,14 @@ class BackupController private constructor(
                 result = outcome.result,
                 nowEpochMillis = System.currentTimeMillis(),
                 pauseReason = reason,
-            ).copy(driveStatus = outcome.driveStatus, backedUpCount = onPhone)
+            ).let { next ->
+                val started = it.runStartedAtMillis
+                if (next.status == BackupStatus.Done && started != null) {
+                    next.copy(lastRunTookMillis = System.currentTimeMillis() - started)
+                } else {
+                    next
+                }
+            }.copy(driveStatus = outcome.driveStatus, backedUpCount = onPhone)
         }
         persistLastBackedUp(outcome.result)
         runPostRunWork()
@@ -453,13 +477,19 @@ class BackupController private constructor(
         }
     }
 
-    private fun progressLedger(recorded: AtomicInteger): BackedUpLedger {
+    private fun progressLedger(recorded: AtomicInteger, sizeById: Map<String, Long> = emptyMap()): BackedUpLedger {
         return object : BackedUpLedger {
             override fun record(mediaId: String, hash: String) {
                 // A run walks every photo again and re-confirms the old ones. Only a new one adds to the count.
                 val isNew = !settings.hasRecorded(mediaId)
                 settings.record(mediaId, hash)
-                if (isNew) _state.update { it.withBackedUpCount(recorded.incrementAndGet()) }
+                if (isNew) {
+                    val size = sizeById[mediaId] ?: 0L
+                    _state.update {
+                        it.withBackedUpCount(recorded.incrementAndGet())
+                            .withCopied(size, System.currentTimeMillis())
+                    }
+                }
             }
 
             override fun clear() {
@@ -573,6 +603,7 @@ class BackupController private constructor(
     )
 
     companion object {
+        private const val SPACE_REFRESH_MS = 120_000L
         private const val DRIVE_GONE_PROBES = 8
         private const val DRIVE_GONE_PROBE_GAP_MS = 750L
         private const val WAKE_LOCK_TAG = "app.photoxpo:backup-run"
