@@ -13,6 +13,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -388,37 +395,42 @@ private fun PreviewQualityStep(
             text = stringResource(R.string.onboarding_quality_body),
             style = MaterialTheme.typography.bodyLarge,
         )
-        WrappingText(
-            text = stringResource(
-                if (usingSample) R.string.onboarding_sample_photo else R.string.onboarding_your_photo,
-            ),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        if (usingSample) {
-            WrappingText(
-                text = stringResource(R.string.onboarding_no_photos),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else if (photoName != null) {
-            WrappingText(
-                text = photoName,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
         val original = if (usingSample) null else originalSizeLabel(originalBytes)
-        if (original != null) {
-            WrappingText(
-                text = original,
-                style = MaterialTheme.typography.bodyLarge,
-            )
+        val detail = when {
+            usingSample -> stringResource(R.string.onboarding_no_photos)
+            else -> listOfNotNull(photoName, original).joinToString("\n")
         }
-        if (canTryAnother) {
-            QuietButton(
-                label = stringResource(R.string.onboarding_try_another),
-                onClick = onTryAnother,
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(
+                        if (usingSample) R.string.onboarding_sample_photo else R.string.onboarding_your_photo,
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (detail.isNotBlank()) {
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (canTryAnother) {
+                FilledTonalButton(
+                    onClick = onTryAnother,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Text(stringResource(R.string.onboarding_try_another))
+                }
+            }
         }
         cards.forEach { card ->
             QualityCard(
@@ -471,17 +483,15 @@ private fun QualityCard(
     image: PreviewJpeg?,
     onSelect: () -> Unit,
 ) {
+    val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(20.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (model.selected) colors.primaryContainer else colors.background, shape)
             .border(
-                width = if (model.selected) 3.dp else 1.dp,
-                color = if (model.selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline
-                },
+                width = 2.dp,
+                color = if (model.selected) colors.primary else colors.outlineVariant,
                 shape = shape,
             )
             .clip(shape)
@@ -490,45 +500,68 @@ private fun QualityCard(
                 onClick = onSelect,
                 role = Role.RadioButton,
             )
-            .padding(12.dp),
+            .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PreviewStill(
-            jpeg = image,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1.5f)
-                .clip(RoundedCornerShape(12.dp)),
-        )
-        if (model.selected) {
-            WrappingText(
-                text = stringResource(R.string.onboarding_selected),
-                style = MaterialTheme.typography.labelLarge,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PreviewStill(
+                jpeg = image,
+                modifier = Modifier
+                    .size(104.dp)
+                    .clip(RoundedCornerShape(12.dp)),
             )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(text = model.name, style = MaterialTheme.typography.titleMedium)
+                if (model.recommended) {
+                    Text(
+                        text = stringResource(R.string.onboarding_recommended),
+                        modifier = Modifier
+                            .background(colors.primary, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 1.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.onPrimary,
+                    )
+                }
+                Text(
+                    text = model.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (model.selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .border(
+                        width = 2.dp,
+                        color = if (model.selected) colors.primary else colors.outline,
+                        shape = CircleShape,
+                    )
+                    .background(if (model.selected) colors.primary else Color.Transparent, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (model.selected) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_check),
+                        contentDescription = stringResource(R.string.onboarding_selected),
+                        tint = colors.onPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
         }
-        WrappingText(
-            text = model.name,
-            style = MaterialTheme.typography.titleLarge,
-        )
-        if (model.recommended) {
-            WrappingText(
-                text = stringResource(R.string.onboarding_recommended),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
+        Column(
+            modifier = Modifier.padding(horizontal = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(text = model.previewSize, style = MaterialTheme.typography.bodyMedium)
+            Text(text = model.estimate, style = MaterialTheme.typography.bodyMedium)
         }
-        WrappingText(
-            text = model.description,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        WrappingText(
-            text = model.previewSize,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        WrappingText(
-            text = model.estimate,
-            style = MaterialTheme.typography.bodyLarge,
-        )
     }
 }
 
@@ -592,7 +625,7 @@ private fun ScreenTitle(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .semantics { heading() },
-        style = MaterialTheme.typography.headlineMedium,
+        style = MaterialTheme.typography.headlineSmall,
         softWrap = true,
         overflow = TextOverflow.Visible,
     )
@@ -622,11 +655,12 @@ private fun BigButton(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp),
+        shape = RoundedCornerShape(28.dp),
     ) {
         Text(
             text = label,
             modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             softWrap = true,
             overflow = TextOverflow.Visible,
