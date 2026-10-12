@@ -59,7 +59,7 @@ class SafArchiveDrive(
         val uri = synchronized(gate) { documentUri(requireDoc(path).documentId) }
         val pfd = onDrive { resolver.openFileDescriptor(uri, "wt") }
             ?: throw DriveUnavailableException("Archive Drive is absent")
-        return SyncingOutputStream(pfd)
+        return DurableOutputStream(pfd)
     }
 
     override fun read(path: String): InputStream {
@@ -126,26 +126,19 @@ class SafArchiveDrive(
         if (!exists(path)) {
             create(path)
         }
-        // The Manifest is the source of truth. Append in place so a kill can lose at most the last,
-        // partial line (the reader ignores it). Rewriting with "wt" would truncate every earlier line first.
+        // The Manifest is append-only. A kill can lose at most the last, partial line.
+        // If append cannot be opened, fail closed. The Backup run stops and this Original
+        // is not Backed up. Rewriting the file would drop every earlier line.
         val uri = synchronized(gate) { documentUri(requireDoc(path).documentId) }
         val appended = try {
             onDrive { resolver.openFileDescriptor(uri, "wa") }
         } catch (e: DriveUnavailableException) {
             throw e
-        } catch (_: Exception) {
-            null
-        }
-        if (appended != null) {
-            SyncingOutputStream(appended).use { output ->
-                output.write(text.toByteArray(Charsets.UTF_8))
-            }
-            return
-        }
-        // Provider rejects "wa": rewrite the combined text instead.
-        val combined = readText(path) + text
-        write(path).use { output ->
-            output.write(combined.toByteArray(Charsets.UTF_8))
+        } catch (e: Exception) {
+            throw IOException("Could not append to $path on the Archive Drive", e)
+        } ?: throw IOException("Could not append to $path on the Archive Drive")
+        DurableOutputStream(appended).use { output ->
+            output.write(text.toByteArray(Charsets.UTF_8))
         }
     }
 
@@ -249,10 +242,10 @@ class SafArchiveDrive(
         val actual = displayName(newId)
             ?: throw IOException("Archive Drive did not return a name after rename")
         if (actual == toName) return newId
-        val restored = onDrive {
+        val rolledBack = onDrive {
             DocumentsContract.renameDocument(resolver, documentUri(newId), fromName)
         }
-        if (restored == null || displayName(DocumentsContract.getDocumentId(restored)) != fromName) {
+        if (rolledBack == null || displayName(DocumentsContract.getDocumentId(rolledBack)) != fromName) {
             throw IOException("Archive Drive renamed $fromName to $actual")
         }
         return null
@@ -376,7 +369,7 @@ class SafArchiveDrive(
         val mimeType: String?,
     )
 
-    private class SyncingOutputStream(
+    private class DurableOutputStream(
         private val descriptor: ParcelFileDescriptor,
     ) : OutputStream() {
         private val stream = ParcelFileDescriptor.AutoCloseOutputStream(descriptor)

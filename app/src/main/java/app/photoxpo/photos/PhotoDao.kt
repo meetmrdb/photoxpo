@@ -26,6 +26,16 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE hash IN (:hashes)")
     suspend fun getByHashes(hashes: List<String>): List<PhotoEntity>
 
+    @Query("SELECT * FROM photos")
+    suspend fun all(): List<PhotoEntity>
+
+    /**
+     * Every cached photo is not Backed up, and its Original is not on this Archive Drive.
+     * The row, Preview file name, and other fields stay.
+     */
+    @Query("UPDATE photos SET backedUp = 0, originalOnThisDrive = 0")
+    suspend fun clearBackedUpAndDriveFlags()
+
     @Query("UPDATE photos SET mediaId = :mediaId, previewFile = :previewFile WHERE hash = :hash")
     suspend fun linkPhone(hash: String, mediaId: Long?, previewFile: String?)
 

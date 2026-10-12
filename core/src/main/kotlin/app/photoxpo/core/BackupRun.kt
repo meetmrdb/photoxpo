@@ -94,14 +94,9 @@ class BackupRunner(
 
                 override fun updateNames(entry: ManifestFileEntry) {
                     val line = fileLine(entry)
-                    if (linesByHash.containsKey(entry.hash)) {
-                        linesByHash[entry.hash] = line
-                        archiveDrive.delete(manifestPath)
-                        archiveDrive.appendText(manifestPath, manifestBody(header, linesByHash))
-                    } else {
-                        linesByHash[entry.hash] = line
-                        archiveDrive.appendText(manifestPath, line + "\n")
-                    }
+                    linesByHash[entry.hash] = line
+                    // The earlier line for this hash stays. ManifestReader merges both.
+                    archiveDrive.appendText(manifestPath, line + "\n")
                 }
             }
             val copier = OriginalCopier(
@@ -209,17 +204,6 @@ class BackupRunner(
             archiveDrive.delete(DRIVE_ID_PATH)
         }
         archiveDrive.appendText(DRIVE_ID_PATH, id.trim() + "\n")
-    }
-}
-
-private fun manifestBody(header: String, linesByHash: Map<String, String>): String {
-    return buildString {
-        append(header)
-        append('\n')
-        for (line in linesByHash.values) {
-            append(line)
-            append('\n')
-        }
     }
 }
 

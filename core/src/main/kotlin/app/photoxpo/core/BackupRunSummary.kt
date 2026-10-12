@@ -7,7 +7,9 @@ import java.time.Instant
  *
  * [runFile] is the file name under Photoxpo/.photoxpo/runs, for example
  * `20261011T183000000Z.jsonl`. [startedAt] and [endedAt] are the timestamps
- * written in that file. [fileCount] and [bytes] count committed file lines.
+ * written in that file. [fileCount] and [bytes] count distinct hashes on
+ * committed file lines. A second line with the same hash is another source
+ * name, not another file.
  * [elapsedMs] and [mbPerSecond] come from the footer. [interrupted] is true
  * when the run file has no footer.
  */

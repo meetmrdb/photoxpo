@@ -1,6 +1,9 @@
 package app.photoxpo.nav
 
 import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
@@ -72,6 +75,16 @@ fun HomeRoute(
         onOpenHistory = onOpenHistory,
         onChooseDrive = onChooseDrive ?: pickDrive,
         onUseThisDriveInstead = onUseThisDriveInstead ?: controller::useThisDriveInstead,
+        onOpenSettings = {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+            try {
+                context.startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                // The phone has no Settings screen for this app.
+            }
+        },
         modifier = modifier,
     )
 

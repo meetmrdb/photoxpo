@@ -21,13 +21,26 @@ data class ManifestContents(
 class ManifestReader {
     fun read(manifestText: String): ManifestContents {
         val entries = mutableListOf<ManifestFileEntry>()
+        val indexByHash = HashMap<String, Int>()
         var sawFooter = false
         for (raw in completeLines(manifestText)) {
             val line = raw.trim()
             if (line.isEmpty()) continue
             val fields = JsonObjectParser(line).parse() ?: continue
             when (fields.text("type")) {
-                "file" -> fields.toFileEntry()?.let { entries += it }
+                "file" -> {
+                    val entry = fields.toFileEntry() ?: continue
+                    val existing = indexByHash[entry.hash]
+                    if (existing == null) {
+                        indexByHash[entry.hash] = entries.size
+                        entries += entry
+                    } else {
+                        // Same hash is one Original. The first drivePath stays. Names are the union.
+                        val prior = entries[existing]
+                        val names = (prior.originalFilenames + entry.originalFilenames).distinct()
+                        entries[existing] = prior.copy(originalFilenames = names)
+                    }
+                }
                 "footer" -> sawFooter = true
             }
         }

@@ -4,6 +4,9 @@ import app.photoxpo.core.BackupRunResult
 import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.ItemState
 import app.photoxpo.data.DriveStatus
+import app.photoxpo.onboarding.MediaAccessState
+import app.photoxpo.onboarding.accessWarning
+import app.photoxpo.onboarding.classifyMediaAccess
 
 const val DEFAULT_FILE_CAP = 200
 
@@ -18,11 +21,58 @@ const val MESSAGE_NEEDS_ATTENTION = "An Original needs attention."
 const val MESSAGE_CHOOSE_DRIVE = "Choose an Archive Drive first."
 
 const val MESSAGE_CONNECTED_DEVICE_FALLBACK =
-    "The Backup run could not use the connected device service, so it is using the data transfer service."
+    "Backing up your photos. Keep your Archive Drive plugged in."
 
 enum class PauseReason {
     DriveOut,
     User,
+}
+
+/** Why this session cannot start a Backup run. */
+enum class SessionAccess {
+    PartialPhotos,
+    DeniedPhotos,
+    Location,
+}
+
+/**
+ * Full photo and video access, then photo location access.
+ * [imagesGranted], [videosGranted], and [selectedGranted] only choose the warning
+ * when full access is already false.
+ */
+fun sessionAccessBlock(
+    hasFullMediaAccess: Boolean,
+    hasAccessMediaLocation: Boolean,
+    imagesGranted: Boolean = false,
+    videosGranted: Boolean = false,
+    selectedGranted: Boolean = false,
+): SessionAccess? {
+    if (!hasFullMediaAccess) {
+        val photos = classifyMediaAccess(
+            fullAccess = false,
+            imagesGranted = imagesGranted,
+            videosGranted = videosGranted,
+            selectedGranted = selectedGranted,
+        )
+        return if (photos == MediaAccessState.Denied) {
+            SessionAccess.DeniedPhotos
+        } else {
+            SessionAccess.PartialPhotos
+        }
+    }
+    if (!hasAccessMediaLocation) return SessionAccess.Location
+    return null
+}
+
+fun sessionAccessMessage(access: SessionAccess): String {
+    return when (access) {
+        SessionAccess.PartialPhotos ->
+            checkNotNull(accessWarning(MediaAccessState.Partial)).message
+        SessionAccess.DeniedPhotos ->
+            checkNotNull(accessWarning(MediaAccessState.Denied)).message
+        SessionAccess.Location ->
+            "Photoxpo cannot see where your photos were taken, so the Original on the Archive Drive would not include it."
+    }
 }
 
 sealed interface BackupStatus {
@@ -47,6 +97,7 @@ data class BackupUiState(
     val driveStatus: DriveStatus = DriveStatus.Absent,
     val fileCap: Int = DEFAULT_FILE_CAP,
     val message: String? = null,
+    val sessionAccess: SessionAccess? = null,
 )
 
 fun BackupUiState.runStarted(

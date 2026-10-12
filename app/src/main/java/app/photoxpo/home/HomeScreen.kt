@@ -44,6 +44,7 @@ fun HomeScreen(
     onOpenHistory: () -> Unit = {},
     onChooseDrive: () -> Unit = {},
     onUseThisDriveInstead: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     var hideMismatch by remember { mutableStateOf(false) }
     LaunchedEffect(model.showDriveMismatch) {
@@ -57,6 +58,12 @@ fun HomeScreen(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        model.accessWarning?.let { warning ->
+            AccessWarningBanner(
+                warning = warning,
+                onOpenSettings = onOpenSettings,
+            )
+        }
         model.offlineBanner?.let { banner ->
             OfflineBanner(
                 banner = banner,
@@ -130,6 +137,35 @@ fun HomeScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun AccessWarningBanner(
+    warning: HomeAccessWarning,
+    onOpenSettings: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = warning.title,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = warning.message,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            TextButton(onClick = onOpenSettings) {
+                Text(warning.actionLabel)
+            }
+        }
     }
 }
 
