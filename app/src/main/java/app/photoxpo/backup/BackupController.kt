@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import app.photoxpo.core.BackupRunResult
 import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.BackupRunner
+import app.photoxpo.core.DriveFullException
 import app.photoxpo.core.BackedUpLedger
 import app.photoxpo.core.ItemState
 import app.photoxpo.PhotoxpoApp
@@ -306,7 +307,11 @@ class BackupController private constructor(
             // A cable pulled in the middle of a copy can surface as a plain I/O error, and the system
             // may take a few seconds to say the drive is gone. Give it that time before calling this
             // a problem with an Original.
-            val drive = withContext(Dispatchers.IO) { probeUntilGone(uri) }
+            val drive = if (error is DriveFullException) {
+                DriveStatus.Ready
+            } else {
+                withContext(Dispatchers.IO) { probeUntilGone(uri) }
+            }
             val onPhone = backedUpOnThisPhone()
             val copiedSome = onPhone > alreadyBackedUp
             val now = System.currentTimeMillis()
@@ -326,11 +331,11 @@ class BackupController private constructor(
             }
             _state.update {
                 it.copy(
-                    status = BackupStatus.NeedsAttention,
+                    status = if (error is DriveFullException) BackupStatus.DriveFull else BackupStatus.NeedsAttention,
                     driveStatus = drive,
                     backedUpCount = onPhone,
                     lastBackedUpAtEpochMillis = if (copiedSome) now else it.lastBackedUpAtEpochMillis,
-                    message = error.message ?: MESSAGE_NEEDS_ATTENTION,
+                    message = if (error is DriveFullException) MESSAGE_DRIVE_FULL else error.message ?: MESSAGE_NEEDS_ATTENTION,
                 )
             }
             stopService()

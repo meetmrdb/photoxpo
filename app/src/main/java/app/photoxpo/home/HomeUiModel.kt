@@ -36,6 +36,7 @@ data class HomeUiModel(
     val showDriveMismatch: Boolean,
     val accessWarning: HomeAccessWarning?,
     val driveConnected: Boolean = true,
+    val driveFull: Boolean = false,
     val driveChipLabel: String = "Drive connected",
     val showProgress: Boolean = false,
     val lastBackedUpDate: String? = null,
@@ -59,6 +60,7 @@ fun homeUiModel(
         showDriveMismatch = state.status == BackupStatus.DriveMismatch,
         accessWarning = homeAccessWarning(state.sessionAccess),
         driveConnected = state.driveStatus == DriveStatus.Ready,
+        driveFull = state.status == BackupStatus.DriveFull,
         driveChipLabel = driveChipLabel(state.driveStatus),
         showProgress = state.status == BackupStatus.Running || state.status is BackupStatus.Paused,
         lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
@@ -112,6 +114,7 @@ private fun statusSentence(state: BackupUiState): String {
         }
         BackupStatus.DriveMismatch ->
             "This Archive Drive is not the one this phone remembers"
+        BackupStatus.DriveFull -> "Your Archive Drive is full"
         BackupStatus.NeedsAttention -> "An Original needs attention"
     }
 }
@@ -126,6 +129,7 @@ private fun backedUpSentence(count: Int): String {
 
 private fun primaryLabel(state: BackupUiState): String {
     if (state.status == BackupStatus.Running) return "Pause"
+    if (state.status == BackupStatus.DriveFull) return "Choose another drive"
     val more = state.status == BackupStatus.Done
     val status = state.status
     if (status is BackupStatus.Paused && status.reason == PauseReason.DriveOut && state.driveStatus == DriveStatus.Ready) {

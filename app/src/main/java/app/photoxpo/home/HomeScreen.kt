@@ -171,7 +171,7 @@ fun HomeScreen(
                 }
             } else {
                 Button(
-                    onClick = onPrimary,
+                    onClick = if (model.driveFull) onChooseDrive else onPrimary,
                     enabled = canStart,
                     modifier = Modifier
                         .fillMaxWidth()

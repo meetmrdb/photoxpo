@@ -125,6 +125,22 @@ class HomeUiModelTest {
     }
 
     @Test
+    fun driveFull_saysSoAndOffersAnotherDrive() {
+        val model = homeUiModel(
+            base(
+                status = BackupStatus.DriveFull,
+                backedUpCount = 443,
+                totalCount = 528,
+                driveStatus = DriveStatus.Ready,
+            ),
+            NOW,
+        )
+        assertEquals("Your Archive Drive is full", model.statusSentence)
+        assertEquals("Choose another drive", model.primaryLabel)
+        assertEquals(true, model.driveFull)
+    }
+
+    @Test
     fun done_offersAnotherCappedRun() {
         val model = homeUiModel(
             base(

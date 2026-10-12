@@ -17,6 +17,7 @@ const val MESSAGE_PAUSED_USER = "Backup run paused."
 const val MESSAGE_DRIVE_MISMATCH = "This Archive Drive is not the one this phone remembers."
 
 const val MESSAGE_NEEDS_ATTENTION = "An Original needs attention."
+const val MESSAGE_DRIVE_FULL = "Your Archive Drive is full."
 
 const val MESSAGE_CHOOSE_DRIVE = "Choose an Archive Drive first."
 
@@ -85,6 +86,8 @@ sealed interface BackupStatus {
     data object Done : BackupStatus
 
     data object DriveMismatch : BackupStatus
+
+    data object DriveFull : BackupStatus
 
     data object NeedsAttention : BackupStatus
 }

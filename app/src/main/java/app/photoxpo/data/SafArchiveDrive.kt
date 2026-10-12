@@ -4,8 +4,11 @@ import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
+import android.system.ErrnoException
+import android.system.OsConstants
 import app.photoxpo.core.ArchiveDrive
 import app.photoxpo.core.CreateResult
+import app.photoxpo.core.DriveFullException
 import app.photoxpo.core.DriveUnavailableException
 import app.photoxpo.core.RenameResult
 import java.io.FileNotFoundException
@@ -376,19 +379,35 @@ class SafArchiveDrive(
         private var closed = false
 
         override fun write(byte: Int) {
-            stream.write(byte)
+            try {
+                stream.write(byte)
+            } catch (e: IOException) {
+                throw noRoomOrSame(e)
+            }
         }
 
         override fun write(bytes: ByteArray) {
-            stream.write(bytes)
+            try {
+                stream.write(bytes)
+            } catch (e: IOException) {
+                throw noRoomOrSame(e)
+            }
         }
 
         override fun write(bytes: ByteArray, off: Int, len: Int) {
-            stream.write(bytes, off, len)
+            try {
+                stream.write(bytes, off, len)
+            } catch (e: IOException) {
+                throw noRoomOrSame(e)
+            }
         }
 
         override fun flush() {
-            stream.flush()
+            try {
+                stream.flush()
+            } catch (e: IOException) {
+                throw noRoomOrSame(e)
+            }
         }
 
         override fun close() {
@@ -406,11 +425,21 @@ class SafArchiveDrive(
             } catch (e: IOException) {
                 if (failure == null) failure = e
             }
-            if (failure != null) throw failure
+            if (failure != null) throw noRoomOrSame(failure)
         }
     }
 
     private companion object {
+        /** A write that fails because the drive is full is not a damaged Original or a pulled cable. */
+        fun noRoomOrSame(error: IOException): IOException {
+            val full = generateSequence<Throwable>(error) { it.cause }.any { cause ->
+                (cause is ErrnoException && cause.errno == OsConstants.ENOSPC) ||
+                    cause.message?.contains("ENOSPC") == true ||
+                    cause.message?.contains("No space left", ignoreCase = true) == true
+            }
+            return if (full) DriveFullException(error) else error
+        }
+
         const val OCTET_STREAM = "application/octet-stream"
         val CHILD_COLUMNS = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
