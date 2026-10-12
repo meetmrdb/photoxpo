@@ -48,52 +48,66 @@ class PhotosRepository(
     }
 
     /**
+     * The person chose "Use this drive instead". Every cached photo is not Backed up,
+     * and its Original is not on this Archive Drive. The row and Preview stay.
+     */
+    suspend fun markOriginalsNotOnThisDrive() {
+        dao.clearBackedUpAndDriveFlags()
+    }
+
+    /**
      * Reads Manifests on [archiveDrive] and stores those Originals.
      * The drive wins for name, date, size, kind, source tag, and drive path.
      * Phone-only facts already stored for that hash are kept: [PhotoEntity.mediaId],
      * [PhotoEntity.originalOnPhone], and [PhotoEntity.previewFile].
-     * Each entry read from the drive is marked Backed up, with the Original on this Archive Drive.
+     * A hash listed on the drive is Backed up, with the Original on this Archive Drive.
+     * A cached hash that is not in the Manifests is not Backed up, and its Original
+     * is not on this Archive Drive. An empty run file still updates those cached photos.
      * If the drive cannot be read, this throws and leaves stored rows unchanged.
      */
     suspend fun refreshFromManifests(archiveDrive: ArchiveDrive) {
         val manifests = withContext(Dispatchers.IO) {
             manifestReader.readAll(archiveDrive)
         }
-        val latest = linkedMapOf<String, ManifestFileEntry>()
-        for (contents in manifests) {
-            for (entry in contents.entries) {
-                latest[entry.hash] = entry
-            }
-        }
-        if (latest.isEmpty()) return
-        val existing = existingByHash(latest.keys)
-        val merged = latest.values.map { entry -> merge(entry, existing[entry.hash]) }
-        dao.upsert(merged)
+        val updated = applyDriveManifest(dao.all(), manifests.flatMap { it.entries })
+        if (updated.isNotEmpty()) dao.upsert(updated)
     }
+}
 
-    private suspend fun existingByHash(hashes: Set<String>): Map<String, PhotoEntity> {
-        if (hashes.isEmpty()) return emptyMap()
-        val rows = ArrayList<PhotoEntity>(hashes.size)
-        for (chunk in hashes.chunked(500)) {
-            rows += dao.getByHashes(chunk)
-        }
-        return rows.associateBy { it.hash }
+/**
+ * Applies Manifest [entries] to [cached] photos.
+ * The last entry for a hash wins. A cached hash with no entry keeps its row
+ * and Preview, and is not Backed up on this Archive Drive.
+ */
+internal fun applyDriveManifest(
+    cached: List<PhotoEntity>,
+    entries: List<ManifestFileEntry>,
+): List<PhotoEntity> {
+    val latest = linkedMapOf<String, ManifestFileEntry>()
+    for (entry in entries) {
+        latest[entry.hash] = entry
     }
+    val byHash = cached.associateBy { it.hash }
+    val missing = cached
+        .filter { it.hash !in latest }
+        .map { it.copy(backedUp = false, originalOnThisDrive = false) }
+    val present = latest.values.map { entry -> mergeDriveEntry(entry, byHash[entry.hash]) }
+    return missing + present
+}
 
-    private fun merge(entry: ManifestFileEntry, prior: PhotoEntity?): PhotoEntity {
-        return PhotoEntity(
-            hash = entry.hash,
-            mediaId = prior?.mediaId,
-            name = entry.originalFilename,
-            chosenDate = entry.chosenDate,
-            sourceTag = entry.sourceTag,
-            kind = entry.kind,
-            sizeBytes = entry.size,
-            drivePath = entry.drivePath,
-            backedUp = true,
-            previewFile = prior?.previewFile,
-            originalOnThisDrive = true,
-            originalOnPhone = prior?.originalOnPhone ?: false,
-        )
-    }
+private fun mergeDriveEntry(entry: ManifestFileEntry, prior: PhotoEntity?): PhotoEntity {
+    return PhotoEntity(
+        hash = entry.hash,
+        mediaId = prior?.mediaId,
+        name = entry.originalFilename,
+        chosenDate = entry.chosenDate,
+        sourceTag = entry.sourceTag,
+        kind = entry.kind,
+        sizeBytes = entry.size,
+        drivePath = entry.drivePath,
+        backedUp = true,
+        previewFile = prior?.previewFile,
+        originalOnThisDrive = true,
+        originalOnPhone = prior?.originalOnPhone ?: false,
+    )
 }

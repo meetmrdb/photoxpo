@@ -42,8 +42,7 @@ internal fun whereTheOriginalIs(onDrive: Boolean, onPhone: Boolean): String {
     return when {
         onDrive && onPhone -> "On this phone and your drive"
         onDrive -> "On your Archive Drive"
-        onPhone -> "Only on this phone"
-        else -> "Not on this phone"
+        else -> "Original not on this Archive Drive"
     }
 }
 

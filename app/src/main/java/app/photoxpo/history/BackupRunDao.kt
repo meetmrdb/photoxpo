@@ -18,4 +18,8 @@ interface BackupRunDao {
 
     @Upsert
     suspend fun upsert(runs: List<BackupRunEntity>)
+
+    /** Drops the phone's Backup history cache. */
+    @Query("DELETE FROM backup_runs")
+    suspend fun clear()
 }

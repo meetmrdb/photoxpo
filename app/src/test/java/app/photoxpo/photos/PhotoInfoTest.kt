@@ -35,9 +35,24 @@ class PhotoInfoTest {
             ),
             previewSizeBytes = 512,
         )
-        assertEquals("Only on this phone", info.whereTheOriginalIs)
+        assertEquals("Original not on this Archive Drive", info.whereTheOriginalIs)
         assertEquals("No", info.backedUp)
         assertEquals("Not on your Archive Drive", info.driveFolder)
+    }
+
+    @Test
+    fun originalNotOnThisArchiveDrive() {
+        val info = PhotoInfo.from(
+            sample(
+                originalOnThisDrive = false,
+                originalOnPhone = true,
+                backedUp = false,
+                drivePath = "Photoxpo/Originals/2020/2020-01/IMG.jpg",
+            ),
+            previewSizeBytes = 100,
+        )
+        assertEquals("Original not on this Archive Drive", info.whereTheOriginalIs)
+        assertEquals("No", info.backedUp)
     }
 
     @Test

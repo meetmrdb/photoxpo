@@ -6,6 +6,13 @@ import app.photoxpo.core.BackedUpLedger
 import app.photoxpo.core.DriveIdentityStore
 import app.photoxpo.core.PreviewPreset
 
+/** When the phone last read Backup history from the Archive Drive. */
+interface LastArchiveDriveConnection {
+    fun lastConnectedAtEpochMillis(): Long?
+
+    fun setLastConnectedAtEpochMillis(epochMillis: Long)
+}
+
 /**
  * Phone-side memory for the Archive Drive: expected drive id, Backed up hashes,
  * last Backed up time, the last time the Archive Drive was connected, chosen tree,
@@ -13,7 +20,7 @@ import app.photoxpo.core.PreviewPreset
  */
 class BackupSettingsStore(
     context: Context,
-) : DriveIdentityStore, BackedUpLedger {
+) : DriveIdentityStore, BackedUpLedger, LastArchiveDriveConnection {
     private val settings = context.applicationContext.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
     private val ledger = context.applicationContext.getSharedPreferences(LEDGER_PREFS, Context.MODE_PRIVATE)
 
@@ -64,12 +71,12 @@ class BackupSettingsStore(
         settings.edit().putLong(KEY_LAST_BACKED_UP_AT, epochMillis).commit()
     }
 
-    fun lastConnectedAtEpochMillis(): Long? {
+    override fun lastConnectedAtEpochMillis(): Long? {
         if (!settings.contains(KEY_LAST_CONNECTED_AT)) return null
         return settings.getLong(KEY_LAST_CONNECTED_AT, 0L)
     }
 
-    fun setLastConnectedAtEpochMillis(epochMillis: Long) {
+    override fun setLastConnectedAtEpochMillis(epochMillis: Long) {
         settings.edit().putLong(KEY_LAST_CONNECTED_AT, epochMillis).commit()
     }
 

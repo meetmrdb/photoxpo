@@ -1,6 +1,6 @@
 package app.photoxpo.history
 
-import app.photoxpo.backup.BackupSettingsStore
+import app.photoxpo.backup.LastArchiveDriveConnection
 import app.photoxpo.core.ArchiveDrive
 import app.photoxpo.core.BackupHistoryReader
 import app.photoxpo.core.BackupRunSummary
@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
  */
 class BackupHistoryRepository(
     private val dao: BackupRunDao,
-    private val settings: BackupSettingsStore,
+    private val settings: LastArchiveDriveConnection,
     private val reader: BackupHistoryReader = BackupHistoryReader(),
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
@@ -39,6 +39,11 @@ class BackupHistoryRepository(
         }
         settings.setLastConnectedAtEpochMillis(clock())
         return dao.all().map { it.toSummary() }
+    }
+
+    /** Drops cached Backup runs so a new Archive Drive does not keep the previous history. */
+    suspend fun clear() {
+        dao.clear()
     }
 }
 

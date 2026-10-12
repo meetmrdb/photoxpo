@@ -10,11 +10,14 @@ import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.BackupRunner
 import app.photoxpo.core.BackedUpLedger
 import app.photoxpo.core.ItemState
+import app.photoxpo.PhotoxpoApp
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.data.MediaStoreSource
 import app.photoxpo.data.SafArchiveDrive
 import app.photoxpo.data.isPersistedTreeGrantHeld
 import app.photoxpo.data.probeArchiveDrive
+import app.photoxpo.history.BackupHistoryRepository
+import app.photoxpo.photos.PhotosDatabase
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -141,8 +144,9 @@ class BackupController private constructor(
     fun refreshDrive() = onVolumesChanged()
 
     /**
-     * The person confirmed "Use this drive instead". The drive wins: Backed up is cleared on every
-     * item, Previews are kept and marked as not on this drive, and a new drive id starts.
+     * The person confirmed "Use this drive instead". The drive wins: every photo is not
+     * Backed up and its Original is not on this Archive Drive. Previews stay. The phone's
+     * Backup history cache is cleared, Home's count goes back to 0, and a new drive id starts.
      */
     fun useThisDriveInstead() {
         scope.launch {
@@ -155,6 +159,11 @@ class BackupController private constructor(
                     backedUpLedger = progressLedger(AtomicInteger(0)),
                     previewPreset = settings.previewPreset(),
                 ).useThisDriveInstead()
+                (appContext as PhotoxpoApp).services.photosRepository.markOriginalsNotOnThisDrive()
+                BackupHistoryRepository(
+                    dao = PhotosDatabase.get(appContext).backupRunDao(),
+                    settings = settings,
+                ).clear()
             }
             _state.update { it.copy(status = BackupStatus.Idle, backedUpCount = 0, message = null) }
             onVolumesChanged()
