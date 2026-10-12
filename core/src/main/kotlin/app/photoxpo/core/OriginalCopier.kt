@@ -2,7 +2,6 @@ package app.photoxpo.core
 
 import java.io.InputStream
 import java.io.OutputStream
-import java.security.MessageDigest
 
 internal data class FileBackupResult(
     val outcome: BackupItemOutcome,
@@ -95,12 +94,12 @@ internal class OriginalCopier(
         return displaceUnproven(file, chosen, destination, source)
     }
 
-    private fun listedAndVerified(path: String, source: HashedBytes): Boolean {
+    private fun listedAndVerified(path: String, source: HashedCopy): Boolean {
         val listed = committed.any { it.drivePath == path && it.hash == source.sha256 }
         return listed && verifiedOnDrive(path, source)
     }
 
-    private fun verifiedOnDrive(path: String, source: HashedBytes): Boolean {
+    private fun verifiedOnDrive(path: String, source: HashedCopy): Boolean {
         if (!archiveDrive.exists(path)) return false
         if (archiveDrive.byteCount(path) != source.byteCount) return false
         val onDrive = archiveDrive.read(path).use { input ->
@@ -138,7 +137,7 @@ internal class OriginalCopier(
         file: MediaFile,
         chosen: ChosenDate,
         finalPath: String,
-        source: HashedBytes,
+        source: HashedCopy,
     ): FileBackupResult {
         val partPath = "$finalPath$PART_SUFFIX"
         val copied = writeVerifiedPart(file, partPath, source) ?: return attention(file, copiedFile = true)
@@ -163,7 +162,7 @@ internal class OriginalCopier(
         file: MediaFile,
         chosen: ChosenDate,
         finalPath: String,
-        source: HashedBytes,
+        source: HashedCopy,
     ): FileBackupResult {
         val partPath = "$finalPath$PART_SUFFIX"
         val copied = writeVerifiedPart(file, partPath, source) ?: return attention(file, copiedFile = true)
@@ -196,7 +195,7 @@ internal class OriginalCopier(
         )
     }
 
-    private fun writeVerifiedPart(file: MediaFile, partPath: String, expected: HashedBytes): HashedBytes? {
+    private fun writeVerifiedPart(file: MediaFile, partPath: String, expected: HashedCopy): HashedCopy? {
         if (archiveDrive.exists(partPath)) {
             archiveDrive.delete(partPath)
         }
@@ -224,7 +223,7 @@ internal class OriginalCopier(
         return copied
     }
 
-    private fun hashSource(file: MediaFile): HashedBytes {
+    private fun hashSource(file: MediaFile): HashedCopy {
         return mediaSource.openOriginal(file.id).use { input ->
             copyHashed(input, OutputStream.nullOutputStream())
         }
@@ -273,34 +272,4 @@ internal fun fileNameWithShortHash(filename: String, sha256: String): String {
     return filename.substring(0, dot) + "-" + prefix + filename.substring(dot)
 }
 
-private data class HashedBytes(val sha256: String, val byteCount: Long)
-
-private fun copyHashed(input: InputStream, output: OutputStream): HashedBytes {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val buffer = ByteArray(COPY_BUFFER_BYTES)
-    var byteCount = 0L
-    while (true) {
-        val read = input.read(buffer)
-        if (read < 0) break
-        if (read == 0) continue
-        digest.update(buffer, 0, read)
-        output.write(buffer, 0, read)
-        byteCount += read
-    }
-    output.flush()
-    return HashedBytes(digest.digest().toHex(), byteCount)
-}
-
-private fun ByteArray.toHex(): String {
-    val digits = "0123456789abcdef"
-    val chars = CharArray(size * 2)
-    for (index in indices) {
-        val value = this[index].toInt() and 0xff
-        chars[index * 2] = digits[value ushr 4]
-        chars[index * 2 + 1] = digits[value and 0x0f]
-    }
-    return String(chars)
-}
-
 private const val PART_SUFFIX = ".photoxpo-part"
-private const val COPY_BUFFER_BYTES = 64 * 1024

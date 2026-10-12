@@ -1,5 +1,6 @@
 package app.photoxpo.history
 
+import app.photoxpo.formatByteCount
 import app.photoxpo.core.BackupRunSummary
 import app.photoxpo.core.byBackup
 import app.photoxpo.core.byMonth
@@ -110,15 +111,7 @@ private fun filesLabel(count: Long): String {
     return if (count == 1L) "1 file" else "$count files"
 }
 
-private fun sizeLabel(bytes: Long): String {
-    val size = bytes.coerceAtLeast(0L)
-    return when {
-        size < 1_000L -> if (size == 1L) "1 byte" else "$size bytes"
-        size < 1_000_000L -> "${trimNumber(size / 1_000.0)} KB"
-        size < 1_000_000_000L -> "${trimNumber(size / 1_000_000.0)} MB"
-        else -> "${trimNumber(size / 1_000_000_000.0)} GB"
-    }
-}
+private fun sizeLabel(bytes: Long): String = formatByteCount(bytes)
 
 private fun speedLabel(mbPerSecond: Double?): String? {
     if (mbPerSecond == null || mbPerSecond.isNaN() || mbPerSecond.isInfinite()) return null

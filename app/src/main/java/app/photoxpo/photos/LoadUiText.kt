@@ -1,5 +1,6 @@
 package app.photoxpo.photos
 
+import app.photoxpo.formatByteCount
 data class LoadUiText(
     val message: String?,
     val loadLabel: String?,

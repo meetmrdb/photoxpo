@@ -1,10 +1,10 @@
 package app.photoxpo.photos
 
+import app.photoxpo.formatByteCount
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.round
 
 data class PhotoInfo(
     val date: String,
@@ -54,32 +54,9 @@ internal fun driveFolder(drivePath: String?): String {
     return trimmed.substring(0, slash)
 }
 
-internal fun formatByteCount(bytes: Long): String {
-    if (bytes < 0) return "Unknown"
-    if (bytes < 1024) {
-        return if (bytes == 1L) "1 byte" else "$bytes bytes"
-    }
-    val units = arrayOf("KB", "MB", "GB", "TB")
-    var value = bytes.toDouble()
-    var unitIndex = -1
-    while (unitIndex < units.lastIndex && value >= 1024.0) {
-        value /= 1024.0
-        unitIndex++
-    }
-    return "${trimOneDecimal(value)} ${units[unitIndex]}"
-}
 
 private fun formatChosenDate(chosenDate: String?, zone: ZoneId, locale: Locale): String {
     val date = chosenLocalDate(chosenDate, zone) ?: return "No date"
     return date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale))
 }
 
-private fun trimOneDecimal(value: Double): String {
-    val rounded = round(value * 10.0) / 10.0
-    val whole = rounded.toLong()
-    return if (rounded == whole.toDouble()) {
-        whole.toString()
-    } else {
-        String.format(Locale.US, "%.1f", rounded)
-    }
-}

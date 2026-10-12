@@ -58,7 +58,7 @@ class HistoryUiModelTest {
                     runFile = "stopped.jsonl",
                     startedAt = "2026-10-01T08:00:00.000Z",
                     fileCount = 2,
-                    bytes = 1_500_000,
+                    bytes = 1_572_864, // 1.5 MB (1024-based, shared with Photo info)
                     interrupted = true,
                 ),
             ),
@@ -82,7 +82,7 @@ class HistoryUiModelTest {
                 run(
                     startedAt = "2026-09-01T00:00:00.000Z",
                     fileCount = 4,
-                    bytes = 10_000_000,
+                    bytes = 10_485_760, // 10 MB
                     mbPerSecond = 2.5,
                 ),
             ),

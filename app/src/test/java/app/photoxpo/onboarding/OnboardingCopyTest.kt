@@ -1,5 +1,6 @@
 package app.photoxpo.onboarding
 
+import app.photoxpo.formatByteCount
 import app.photoxpo.core.MediaFile
 import app.photoxpo.core.MediaKind
 import app.photoxpo.core.PreviewPreset
