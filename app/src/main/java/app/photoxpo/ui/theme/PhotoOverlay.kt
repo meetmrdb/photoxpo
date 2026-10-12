@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 object PhotoOverlay {
     val Scrim = Color(0x9E0A1010)
     val OnScrim = Color(0xFFFFFFFF)
+    val Track = Color(0x30FFFFFF)
     val Ring = Color(0x26FFFFFF)
     val RingPressed = Color(0x44FFFFFF)
     val Mint = Color(0xFF7BD5DA)

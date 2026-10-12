@@ -183,9 +183,16 @@ private fun PhotoViewer(
 
     val showOriginal = !loadedUri.isNullOrBlank()
     val previewOnly = !showOriginal && !photo.originalOnPhone
+    val animationsOn = remember {
+        android.provider.Settings.Global.getFloat(
+            context.contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+    }
     val blur by animateDpAsState(
         targetValue = if (previewOnly) 3.dp else 0.dp,
-        animationSpec = tween(durationMillis = 900),
+        animationSpec = tween(durationMillis = if (animationsOn) 900 else 0),
         label = "previewBlur",
     )
     val isVideo = photo.kind.equals("video", ignoreCase = true)

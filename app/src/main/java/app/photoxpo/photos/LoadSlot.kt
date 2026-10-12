@@ -175,7 +175,7 @@ private fun LoadCard(
                     .fillMaxWidth()
                     .height(8.dp),
                 color = PhotoOverlay.Mint,
-                trackColor = Color(0x30FFFFFF),
+                trackColor = PhotoOverlay.Track,
                 strokeCap = StrokeCap.Round,
                 gapSize = 0.dp,
                 drawStopIndicator = {},

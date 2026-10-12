@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -48,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -106,6 +108,7 @@ fun PhotosGrid(
         } else {
             SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
+                    .widthIn(max = 480.dp)
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
             ) {
@@ -168,10 +171,10 @@ private fun GroupedGrid(
                     )
                 }
                 items(
-                    items = group.photos.chunked(columns),
-                    key = { row -> "row-${group.label}-${row.first().hash}" },
+                    items = group.photos.chunked(columns).withIndex().toList(),
+                    key = { (index, row) -> "row-${group.label}-$index-${row.first().hash}" },
                     contentType = { "photo-row" },
-                ) { row ->
+                ) { (_, row) ->
                     Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                         for (photo in row) {
                             PhotoTile(
@@ -270,7 +273,7 @@ private fun PhotoTile(
                 val where = if (photo.originalOnThisDrive) ". On your Archive Drive" else ""
                 contentDescription = (if (isVideo) "Video " else "") + photo.name + where
             }
-            .clickable(onClick = onClick),
+            .clickable(onClickLabel = "Open photo", role = Role.Button, onClick = onClick),
     ) {
         PreviewImage(
             hash = photo.hash,
