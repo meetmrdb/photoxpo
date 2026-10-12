@@ -1,7 +1,9 @@
 package app.photoxpo.backup
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.PowerManager
 import androidx.core.content.ContextCompat
@@ -14,6 +16,8 @@ import app.photoxpo.PhotoxpoApp
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.data.MediaStoreSource
 import app.photoxpo.data.SafArchiveDrive
+import app.photoxpo.data.hasAccessMediaLocation
+import app.photoxpo.data.hasFullMediaAccess
 import app.photoxpo.data.isPersistedTreeGrantHeld
 import app.photoxpo.data.probeArchiveDrive
 import app.photoxpo.history.BackupHistoryRepository
@@ -71,6 +75,11 @@ class BackupController private constructor(
         userStop.set(false)
         cancel.set(false)
         pauseReason.set(PauseReason.User)
+        val blocked = currentSessionAccess()
+        if (blocked != null) {
+            refuseSessionAccess(blocked, cap)
+            return
+        }
         val uri = settings.treeUri()
         if (uri == null || !isPersistedTreeGrantHeld(appContext.contentResolver, uri)) {
             _state.update {
@@ -79,6 +88,7 @@ class BackupController private constructor(
                     fileCap = cap,
                     driveStatus = DriveStatus.Absent,
                     message = MESSAGE_CHOOSE_DRIVE,
+                    sessionAccess = null,
                 )
             }
             return
@@ -91,12 +101,14 @@ class BackupController private constructor(
                     driveStatus = drive,
                     fileCap = cap,
                     message = MESSAGE_DRIVE_OUT,
+                    sessionAccess = null,
                 )
             }
             return
         }
         _state.update {
-            it.runStarted(totalCount = it.totalCount, fileCap = cap, driveStatus = drive).copy(message = null)
+            it.runStarted(totalCount = it.totalCount, fileCap = cap, driveStatus = drive)
+                .copy(sessionAccess = null)
         }
         try {
             ContextCompat.startForegroundService(
@@ -131,6 +143,12 @@ class BackupController private constructor(
         synchronized(runGate) {
             if (userStop.get()) return
             if (runJob?.isActive == true) return
+            val blocked = currentSessionAccess()
+            if (blocked != null) {
+                refuseSessionAccess(blocked, settings.fileCap())
+                stopService()
+                return
+            }
             val uri = settings.treeUri() ?: return
             cancel.set(false)
             val cap = settings.fileCap()
@@ -346,6 +364,35 @@ class BackupController private constructor(
                 settings.clear()
                 recorded.set(0)
             }
+        }
+    }
+
+    private fun currentSessionAccess(): SessionAccess? {
+        return sessionAccessBlock(
+            hasFullMediaAccess = hasFullMediaAccess(appContext),
+            hasAccessMediaLocation = hasAccessMediaLocation(appContext),
+            imagesGranted = isGranted(Manifest.permission.READ_MEDIA_IMAGES),
+            videosGranted = isGranted(Manifest.permission.READ_MEDIA_VIDEO),
+            selectedGranted = isGranted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED),
+        )
+    }
+
+    private fun isGranted(permission: String): Boolean {
+        return appContext.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun refuseSessionAccess(access: SessionAccess, fileCap: Int) {
+        _state.update {
+            val status = when (it.status) {
+                BackupStatus.NeedsAttention -> BackupStatus.NeedsAttention
+                else -> BackupStatus.Idle
+            }
+            it.copy(
+                status = status,
+                fileCap = fileCap,
+                sessionAccess = access,
+                message = sessionAccessMessage(access),
+            )
         }
     }
 

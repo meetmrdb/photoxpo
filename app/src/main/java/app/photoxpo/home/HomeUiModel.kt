@@ -3,12 +3,22 @@ package app.photoxpo.home
 import app.photoxpo.backup.BackupStatus
 import app.photoxpo.backup.BackupUiState
 import app.photoxpo.backup.PauseReason
+import app.photoxpo.backup.SessionAccess
 import app.photoxpo.backup.backupProgressText
+import app.photoxpo.backup.sessionAccessMessage
 import app.photoxpo.data.DriveStatus
+import app.photoxpo.onboarding.MediaAccessState
+import app.photoxpo.onboarding.accessWarning
 
 data class HomeOfflineBanner(
     val message: String,
     val lastBackedUpLine: String,
+)
+
+data class HomeAccessWarning(
+    val title: String,
+    val message: String,
+    val actionLabel: String,
 )
 
 data class HomeUiModel(
@@ -20,6 +30,7 @@ data class HomeUiModel(
     val lastBackedUpLine: String,
     val offlineBanner: HomeOfflineBanner?,
     val showDriveMismatch: Boolean,
+    val accessWarning: HomeAccessWarning?,
 )
 
 fun homeUiModel(
@@ -36,6 +47,21 @@ fun homeUiModel(
         lastBackedUpLine = lastBackedUpLine,
         offlineBanner = offlineBanner(state, lastBackedUpLine),
         showDriveMismatch = state.status == BackupStatus.DriveMismatch,
+        accessWarning = homeAccessWarning(state.sessionAccess),
+    )
+}
+
+fun homeAccessWarning(access: SessionAccess?): HomeAccessWarning? {
+    access ?: return null
+    val copied = when (access) {
+        SessionAccess.PartialPhotos -> accessWarning(MediaAccessState.Partial)
+        SessionAccess.DeniedPhotos -> accessWarning(MediaAccessState.Denied)
+        SessionAccess.Location -> null
+    }
+    return HomeAccessWarning(
+        title = copied?.title ?: "Photo locations are not visible",
+        message = sessionAccessMessage(access),
+        actionLabel = "Open Settings",
     )
 }
 

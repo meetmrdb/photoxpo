@@ -3,7 +3,11 @@ package app.photoxpo.home
 import app.photoxpo.backup.BackupStatus
 import app.photoxpo.backup.BackupUiState
 import app.photoxpo.backup.PauseReason
+import app.photoxpo.backup.SessionAccess
+import app.photoxpo.backup.sessionAccessBlock
 import app.photoxpo.data.DriveStatus
+import app.photoxpo.onboarding.MediaAccessState
+import app.photoxpo.onboarding.accessWarning
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -180,6 +184,77 @@ class HomeUiModelTest {
     }
 
     @Test
+    fun partialPhotoAccess_reusesTheOnboardingWarning_andOffersOpenSettings() {
+        val model = homeUiModel(
+            base(status = BackupStatus.Idle, sessionAccess = SessionAccess.PartialPhotos),
+            NOW,
+        )
+        val warning = checkNotNull(model.accessWarning)
+        val copied = checkNotNull(accessWarning(MediaAccessState.Partial))
+        assertEquals(copied.title, warning.title)
+        assertEquals(copied.message, warning.message)
+        assertEquals("Open Settings", warning.actionLabel)
+        assertEquals("No photos backed up yet", model.statusSentence)
+        assertFalse(model.primaryPauses)
+    }
+
+    @Test
+    fun deniedPhotoAccess_reusesTheOnboardingWarning_andOffersOpenSettings() {
+        val model = homeUiModel(
+            base(sessionAccess = SessionAccess.DeniedPhotos),
+            NOW,
+        )
+        val warning = checkNotNull(model.accessWarning)
+        val copied = checkNotNull(accessWarning(MediaAccessState.Denied))
+        assertEquals(copied.title, warning.title)
+        assertEquals(copied.message, warning.message)
+        assertEquals("Open Settings", warning.actionLabel)
+    }
+
+    @Test
+    fun missingPhotoLocation_showsAPlainWarning_andOffersOpenSettings() {
+        val model = homeUiModel(
+            base(status = BackupStatus.NeedsAttention, sessionAccess = SessionAccess.Location),
+            NOW,
+        )
+        val warning = checkNotNull(model.accessWarning)
+        assertEquals("Photo locations are not visible", warning.title)
+        assertEquals(
+            "Photoxpo cannot see where your photos were taken, so the Original on the Archive Drive would not include it.",
+            warning.message,
+        )
+        assertEquals("Open Settings", warning.actionLabel)
+        assertEquals("An Original needs attention", model.statusSentence)
+    }
+
+    @Test
+    fun fullAccess_hidesTheWarning() {
+        assertNull(homeUiModel(base(sessionAccess = null), NOW).accessWarning)
+        assertNull(
+            sessionAccessBlock(
+                hasFullMediaAccess = true,
+                hasAccessMediaLocation = true,
+            ),
+        )
+        assertEquals(
+            SessionAccess.DeniedPhotos,
+            sessionAccessBlock(hasFullMediaAccess = false, hasAccessMediaLocation = true),
+        )
+        assertEquals(
+            SessionAccess.PartialPhotos,
+            sessionAccessBlock(
+                hasFullMediaAccess = false,
+                hasAccessMediaLocation = true,
+                imagesGranted = true,
+            ),
+        )
+        assertEquals(
+            SessionAccess.Location,
+            sessionAccessBlock(hasFullMediaAccess = true, hasAccessMediaLocation = false),
+        )
+    }
+
+    @Test
     fun lastBackedUp_usesTheInjectedClock() {
         val last = 1_000_000L
         fun line(now: Long): String {
@@ -208,6 +283,7 @@ class HomeUiModelTest {
         lastBackedUpAtEpochMillis: Long? = null,
         driveStatus: DriveStatus = DriveStatus.Ready,
         fileCap: Int = 200,
+        sessionAccess: SessionAccess? = null,
     ): BackupUiState {
         return BackupUiState(
             status = status,
@@ -216,6 +292,7 @@ class HomeUiModelTest {
             lastBackedUpAtEpochMillis = lastBackedUpAtEpochMillis,
             driveStatus = driveStatus,
             fileCap = fileCap,
+            sessionAccess = sessionAccess,
         )
     }
 
