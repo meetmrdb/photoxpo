@@ -37,6 +37,7 @@ data class HomeUiModel(
     val accessWarning: HomeAccessWarning?,
     val driveConnected: Boolean = true,
     val driveFull: Boolean = false,
+    val allBackedUp: Boolean = false,
     val spaceLine: String? = null,
     val paceLine: String? = null,
     val lastRunLine: String? = null,
@@ -65,6 +66,7 @@ fun homeUiModel(
         accessWarning = homeAccessWarning(state.sessionAccess),
         driveConnected = state.driveStatus == DriveStatus.Ready,
         driveFull = state.status == BackupStatus.DriveFull,
+        allBackedUp = allBackedUp(state),
         spaceLine = spaceLine(state),
         paceLine = runPaceLine(state, nowEpochMillis),
         lastRunLine = lastRunLine(state),
@@ -73,6 +75,12 @@ fun homeUiModel(
         showProgress = state.status == BackupStatus.Running || state.status is BackupStatus.Paused,
         lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
     )
+}
+
+/** Everything in the Camera folder is Backed up, so there is nothing to start until a new photo appears. */
+private fun allBackedUp(state: BackupUiState): Boolean {
+    val settled = state.status == BackupStatus.Idle || state.status == BackupStatus.Done
+    return settled && state.backedUpCount > 0 && state.filesToCopy == 0
 }
 
 internal fun formatBytes(bytes: Long): String {

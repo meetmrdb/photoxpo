@@ -39,6 +39,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import app.photoxpo.ui.theme.PhotoOverlay
 import androidx.compose.material3.Icon
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import kotlinx.coroutines.launch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,6 +69,9 @@ fun PhotosRoute(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var refreshing by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val photos by produceState<List<PhotoEntity>?>(initialValue = null, repository) {
         repository.photos().collect { value = it }
     }
@@ -81,9 +86,21 @@ fun PhotosRoute(
         onOpenPhoto = onOpenPhoto,
         modifier = modifier,
         contentPadding = contentPadding,
+        isRefreshing = refreshing,
+        onRefresh = {
+            refreshing = true
+            scope.launch {
+                try {
+                    app.photoxpo.backup.BackupController.get(context).refreshNow()
+                } finally {
+                    refreshing = false
+                }
+            }
+        },
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotosGrid(
     photos: List<PhotoEntity>,
@@ -91,6 +108,8 @@ fun PhotosGrid(
     onOpenPhoto: (String) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     var byDay by rememberSaveable { mutableStateOf(false) }
     Column(modifier = modifier.fillMaxSize().padding(contentPadding)) {
@@ -127,12 +146,18 @@ fun PhotosGrid(
                     Text("Days")
                 }
             }
-            GroupedGrid(
-                photos = photos,
-                byDay = byDay,
-                previewCache = previewCache,
-                onOpenPhoto = onOpenPhoto,
-            )
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                GroupedGrid(
+                    photos = photos,
+                    byDay = byDay,
+                    previewCache = previewCache,
+                    onOpenPhoto = onOpenPhoto,
+                )
+            }
         }
     }
 }

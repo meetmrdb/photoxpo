@@ -198,7 +198,12 @@ class BackupController private constructor(
     }
 
     /** Probes the chosen Archive Drive now, for example after the person picks a folder. */
-    fun refreshDrive() = onVolumesChanged()
+    fun refreshDrive(): Job = onVolumesChanged()
+
+    /** Pull-to-refresh: probe the drive, recount what is left to copy, and re-read the drive's Manifests. */
+    suspend fun refreshNow() {
+        onVolumesChanged().join()
+    }
 
     /**
      * The person confirmed "Use this drive instead". The drive wins: every photo is not
@@ -227,8 +232,8 @@ class BackupController private constructor(
         }
     }
 
-    internal fun onVolumesChanged() {
-        scope.launch {
+    internal fun onVolumesChanged(): Job {
+        return scope.launch {
             val uri = settings.treeUri() ?: return@launch
             val probed = withContext(Dispatchers.IO) { probeOrAbsent(uri) }
             _state.update { it.copy(driveStatus = probed) }
@@ -250,7 +255,7 @@ class BackupController private constructor(
             }
             if (probed == DriveStatus.Ready) {
                 refreshSpace()
-                refreshLibraryWhenIdle()
+                refreshLibraryWhenIdle()?.join()
             }
         }
     }
@@ -259,10 +264,10 @@ class BackupController private constructor(
      * The Photos tab fills from the Archive Drive's Manifests, which are only read after a Backup run.
      * A run cut short by a pulled cable never got there, so read them again once the drive is back.
      */
-    private fun refreshLibraryWhenIdle() {
-        if (runJob?.isActive == true || _state.value.status == BackupStatus.Running) return
-        if (!libraryRefreshing.compareAndSet(false, true)) return
-        scope.launch {
+    private fun refreshLibraryWhenIdle(): Job? {
+        if (runJob?.isActive == true || _state.value.status == BackupStatus.Running) return null
+        if (!libraryRefreshing.compareAndSet(false, true)) return null
+        return scope.launch {
             try {
                 runPostRunWork()
             } finally {
@@ -535,10 +540,11 @@ class BackupController private constructor(
             try {
                 val free = archiveDriveFreeBytes(appContext, uri)
                 val ledger = settings.ledgerEntries().keys
-                val toCopy = MediaStoreSource(appContext).listCameraFolder()
+                val left = MediaStoreSource(appContext).listCameraFolder()
                     .filter { it.id !in ledger }
-                    .sumOf { it.sizeBytes }
-                _state.update { it.copy(driveFreeBytes = free, bytesToCopy = toCopy) }
+                _state.update {
+                    it.copy(driveFreeBytes = free, bytesToCopy = left.sumOf { f -> f.sizeBytes }, filesToCopy = left.size)
+                }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
             }

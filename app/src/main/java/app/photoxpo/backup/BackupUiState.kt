@@ -103,6 +103,8 @@ data class BackupUiState(
     val sessionAccess: SessionAccess? = null,
     val driveFreeBytes: Long? = null,
     val bytesToCopy: Long? = null,
+    /** How many Camera files are not Backed up yet; null until Home has looked. */
+    val filesToCopy: Int? = null,
     /** When this run began, and what it had to copy then, so Home can say how long and how much is left. */
     val runStartedAtMillis: Long? = null,
     val runBytesToCopy: Long = 0L,
@@ -127,6 +129,7 @@ fun BackupUiState.runStarted(
         fileCap = fileCap,
         driveStatus = driveStatus,
         message = kept,
+        filesToCopy = null,
         runStartedAtMillis = nowEpochMillis,
         runBytesToCopy = bytesToCopy,
         runBytesCopied = 0L,

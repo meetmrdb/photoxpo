@@ -24,7 +24,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,6 +63,7 @@ import app.photoxpo.ui.components.RowCard
 import app.photoxpo.ui.components.StatusChip
 import app.photoxpo.ui.theme.PhotoxpoTheme
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     model: HomeUiModel,
@@ -71,6 +74,8 @@ fun HomeScreen(
     onChooseDrive: () -> Unit = {},
     onUseThisDriveInstead: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     var hideMismatch by remember { mutableStateOf(false) }
     LaunchedEffect(model.showDriveMismatch) {
@@ -93,11 +98,15 @@ fun HomeScreen(
                 tint = MaterialTheme.colorScheme.onSurface,
             )
         }
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) {
         Column(
             modifier = Modifier
-                .weight(1f)
                 .widthIn(max = 600.dp)
-                .fillMaxWidth()
+                .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(top = 8.dp, bottom = 24.dp),
@@ -117,6 +126,14 @@ fun HomeScreen(
                 tone = if (model.driveConnected) ChipTone.Ok else ChipTone.Warn,
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (model.allBackedUp) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_check_circle),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(40.dp),
+                    )
+                }
                 Text(
                     text = figuresInSans(model.statusSentence),
                     modifier = Modifier.semantics {
@@ -128,6 +145,13 @@ fun HomeScreen(
                 if (model.showProgress) {
                     Text(
                         text = model.progressText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (model.allBackedUp) {
+                    Text(
+                        text = "Everything on your phone is safe on your Archive Drive. Pull down to check for new photos.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -187,7 +211,9 @@ fun HomeScreen(
                     tone = ChipTone.Warn,
                 )
             }
-            if (model.primaryPauses) {
+            if (model.allBackedUp) {
+                // Nothing to start until a new photo shows up.
+            } else if (model.primaryPauses) {
                 FilledTonalButton(
                     onClick = onPrimary,
                     modifier = Modifier
@@ -235,6 +261,7 @@ fun HomeScreen(
                 icon = painterResource(R.drawable.ic_history),
                 onClick = onOpenHistory,
             )
+        }
         }
     }
 

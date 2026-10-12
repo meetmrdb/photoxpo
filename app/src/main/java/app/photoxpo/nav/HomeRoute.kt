@@ -15,6 +15,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -74,8 +76,21 @@ fun HomeRoute(
         }
     }
 
+    var refreshing by remember { mutableStateOf(false) }
+    val refreshScope = rememberCoroutineScope()
     HomeScreen(
         model = model,
+        isRefreshing = refreshing,
+        onRefresh = {
+            refreshing = true
+            refreshScope.launch {
+                try {
+                    controller.refreshNow()
+                } finally {
+                    refreshing = false
+                }
+            }
+        },
         onPrimary = {
             if (model.primaryPauses) {
                 viewModel.pause()
