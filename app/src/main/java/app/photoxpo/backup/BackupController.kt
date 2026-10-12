@@ -271,9 +271,25 @@ class BackupController private constructor(
             }
         } catch (error: Exception) {
             if (error is CancellationException) throw error
+            // A cable pulled in the middle of a copy can surface as a plain I/O error, not as a
+            // missing drive. Look at the drive before calling it a problem with an Original.
+            val drive = withContext(Dispatchers.IO) { probeOrAbsent(uri) }
+            if (drive != DriveStatus.Ready && !userStop.get()) {
+                _state.update {
+                    it.copy(
+                        status = BackupStatus.Paused(PauseReason.DriveOut),
+                        driveStatus = drive,
+                        backedUpCount = backedUpOnThisPhone(),
+                        message = MESSAGE_DRIVE_OUT,
+                    )
+                }
+                stopService()
+                return
+            }
             _state.update {
                 it.copy(
                     status = BackupStatus.NeedsAttention,
+                    driveStatus = drive,
                     message = error.message ?: MESSAGE_NEEDS_ATTENTION,
                 )
             }
