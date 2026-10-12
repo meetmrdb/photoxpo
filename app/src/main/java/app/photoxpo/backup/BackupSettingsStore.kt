@@ -95,6 +95,16 @@ class BackupSettingsStore(
 
     fun hasRecorded(mediaId: String): Boolean = ledger.contains(mediaId)
 
+    /**
+     * Android kills an app that holds a file open on a drive that was pulled, so a run can end without
+     * any code of ours running. This marker survives that, and the next start reads it.
+     */
+    fun setRunActive(active: Boolean) {
+        settings.edit().putBoolean(KEY_RUN_ACTIVE, active).commit()
+    }
+
+    fun runWasCutOff(): Boolean = settings.getBoolean(KEY_RUN_ACTIVE, false)
+
     override fun clear() {
         ledger.edit().clear().commit()
     }
@@ -113,6 +123,7 @@ class BackupSettingsStore(
         const val KEY_TREE_URI = "treeUri"
         const val KEY_FILE_CAP = "fileCap"
         const val KEY_ONBOARDING_DONE = "onboardingDone"
+        const val KEY_RUN_ACTIVE = "runActive"
         const val KEY_PREVIEW_PRESET = "previewPreset"
     }
 }

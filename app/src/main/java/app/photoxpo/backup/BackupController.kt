@@ -56,8 +56,13 @@ class BackupController private constructor(
     private var wakeLock: PowerManager.WakeLock? = null
     private var runJob: Job? = null
 
+    // A run the system cut off (a pulled cable gets the app killed) is a pause for the drive, not a fresh start.
+    private val cutOff = settings.runWasCutOff()
+
     private val _state = MutableStateFlow(
         BackupUiState(
+            status = if (cutOff) BackupStatus.Paused(PauseReason.DriveOut) else BackupStatus.Idle,
+            message = if (cutOff) MESSAGE_DRIVE_OUT else null,
             // The phone's cache of Backed up Originals survives a restart; the drive stays the truth.
             backedUpCount = settings.ledgerEntries().size,
             lastBackedUpAtEpochMillis = settings.lastBackedUpAtEpochMillis(),
@@ -154,7 +159,12 @@ class BackupController private constructor(
             cancel.set(false)
             val cap = settings.fileCap()
             runJob = scope.launch {
-                executeRun(uri, cap)
+                settings.setRunActive(true)
+                try {
+                    executeRun(uri, cap)
+                } finally {
+                    settings.setRunActive(false)
+                }
             }
         }
     }
