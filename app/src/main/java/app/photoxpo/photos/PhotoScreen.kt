@@ -200,7 +200,7 @@ private fun PhotoViewer(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(PhotoOverlay.Backdrop),
     ) {
         PreviewImage(
             hash = photo.hash,

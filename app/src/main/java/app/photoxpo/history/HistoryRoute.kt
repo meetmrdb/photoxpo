@@ -166,10 +166,19 @@ private suspend fun monthStrips(
     zone: ZoneId,
     locale: Locale,
 ): Map<String, List<String>> {
-    val photos = PhotosDatabase.get(context).photoDao().all()
-    return groupByMonth(photos, zone, locale)
+    val dao = PhotosDatabase.get(context).photoDao()
+    val count = dao.count()
+    val key = Triple(count, zone, locale)
+    stripsCache?.let { (cachedKey, strips) -> if (cachedKey == key) return strips }
+    val strips = groupByMonth(dao.all(), zone, locale)
         .associate { group -> group.label to group.photos.take(4).map { it.hash } }
+    stripsCache = key to strips
+    return strips
 }
+
+/** Last month strips, reused while the number of photos is unchanged so revisits skip the full table read. */
+@Volatile
+private var stripsCache: Pair<Triple<Int, ZoneId, Locale>, Map<String, List<String>>>? = null
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

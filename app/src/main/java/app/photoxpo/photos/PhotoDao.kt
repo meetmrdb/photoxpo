@@ -26,6 +26,9 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE hash IN (:hashes)")
     suspend fun getByHashes(hashes: List<String>): List<PhotoEntity>
 
+    @Query("SELECT COUNT(*) FROM photos")
+    suspend fun count(): Int
+
     @Query("SELECT * FROM photos")
     suspend fun all(): List<PhotoEntity>
 

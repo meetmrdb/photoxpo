@@ -224,6 +224,8 @@ private class FakePhotoDao(seed: List<PhotoEntity>) : PhotoDao {
         return hashes.mapNotNull { rows[it] }
     }
 
+    override suspend fun count(): Int = rows.size
+
     override suspend fun all(): List<PhotoEntity> = rows.values.toList()
 
     override suspend fun clearBackedUpAndDriveFlags() {
