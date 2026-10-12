@@ -103,7 +103,12 @@ private fun statusSentence(state: BackupUiState): String {
         BackupStatus.Running -> "Backing up your photos"
         is BackupStatus.Paused -> when (status.reason) {
             PauseReason.User -> "Backup run paused"
-            PauseReason.DriveOut -> "Your Archive Drive is not connected"
+            PauseReason.DriveOut ->
+                if (state.driveStatus == DriveStatus.Ready) {
+                    "Your Archive Drive is back"
+                } else {
+                    "Your Archive Drive is not connected"
+                }
         }
         BackupStatus.DriveMismatch ->
             "This Archive Drive is not the one this phone remembers"
@@ -122,6 +127,10 @@ private fun backedUpSentence(count: Int): String {
 private fun primaryLabel(state: BackupUiState): String {
     if (state.status == BackupStatus.Running) return "Pause"
     val more = state.status == BackupStatus.Done
+    val status = state.status
+    if (status is BackupStatus.Paused && status.reason == PauseReason.DriveOut && state.driveStatus == DriveStatus.Ready) {
+        return "Continue backing up"
+    }
     return startLabel(state.fileCap, more)
 }
 

@@ -50,6 +50,7 @@ class BackupController private constructor(
     private val runGate = Any()
     private val cancel = AtomicBoolean(false)
     private val userStop = AtomicBoolean(false)
+    private val libraryRefreshing = AtomicBoolean(false)
     private val pauseReason = AtomicReference(PauseReason.User)
     private val wakeLockGate = Any()
     private var wakeLock: PowerManager.WakeLock? = null
@@ -202,6 +203,23 @@ class BackupController private constructor(
                     status is BackupStatus.Paused &&
                     status.reason == PauseReason.DriveOut &&
                     !userStop.get() -> scheduleResume()
+            }
+            if (probed == DriveStatus.Ready) refreshLibraryWhenIdle()
+        }
+    }
+
+    /**
+     * The Photos tab fills from the Archive Drive's Manifests, which are only read after a Backup run.
+     * A run cut short by a pulled cable never got there, so read them again once the drive is back.
+     */
+    private fun refreshLibraryWhenIdle() {
+        if (runJob?.isActive == true || _state.value.status == BackupStatus.Running) return
+        if (!libraryRefreshing.compareAndSet(false, true)) return
+        scope.launch {
+            try {
+                runPostRunWork()
+            } finally {
+                libraryRefreshing.set(false)
             }
         }
     }

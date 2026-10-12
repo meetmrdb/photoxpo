@@ -110,6 +110,21 @@ class HomeUiModelTest {
     }
 
     @Test
+    fun pausedForTheDriveButTheDriveIsBack_saysSoAndOffersToContinue() {
+        val model = homeUiModel(
+            base(
+                status = BackupStatus.Paused(PauseReason.DriveOut),
+                backedUpCount = 4,
+                totalCount = 10,
+                driveStatus = DriveStatus.Ready,
+            ),
+            NOW,
+        )
+        assertEquals("Your Archive Drive is back", model.statusSentence)
+        assertEquals("Continue backing up", model.primaryLabel)
+    }
+
+    @Test
     fun done_offersAnotherCappedRun() {
         val model = homeUiModel(
             base(
