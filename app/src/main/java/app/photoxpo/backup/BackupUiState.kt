@@ -21,7 +21,7 @@ const val MESSAGE_NEEDS_ATTENTION = "An Original needs attention."
 const val MESSAGE_CHOOSE_DRIVE = "Choose an Archive Drive first."
 
 const val MESSAGE_CONNECTED_DEVICE_FALLBACK =
-    "The Backup run could not use the connected device service, so it is using the data transfer service."
+    "Backing up your photos. Keep your Archive Drive plugged in."
 
 enum class PauseReason {
     DriveOut,

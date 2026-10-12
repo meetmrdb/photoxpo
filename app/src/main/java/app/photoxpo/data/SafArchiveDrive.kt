@@ -59,7 +59,7 @@ class SafArchiveDrive(
         val uri = synchronized(gate) { documentUri(requireDoc(path).documentId) }
         val pfd = onDrive { resolver.openFileDescriptor(uri, "wt") }
             ?: throw DriveUnavailableException("Archive Drive is absent")
-        return SyncingOutputStream(pfd)
+        return DurableOutputStream(pfd)
     }
 
     override fun read(path: String): InputStream {
@@ -137,7 +137,7 @@ class SafArchiveDrive(
         } catch (e: Exception) {
             throw IOException("Could not append to $path on the Archive Drive", e)
         } ?: throw IOException("Could not append to $path on the Archive Drive")
-        SyncingOutputStream(appended).use { output ->
+        DurableOutputStream(appended).use { output ->
             output.write(text.toByteArray(Charsets.UTF_8))
         }
     }
@@ -242,10 +242,10 @@ class SafArchiveDrive(
         val actual = displayName(newId)
             ?: throw IOException("Archive Drive did not return a name after rename")
         if (actual == toName) return newId
-        val restored = onDrive {
+        val rolledBack = onDrive {
             DocumentsContract.renameDocument(resolver, documentUri(newId), fromName)
         }
-        if (restored == null || displayName(DocumentsContract.getDocumentId(restored)) != fromName) {
+        if (rolledBack == null || displayName(DocumentsContract.getDocumentId(rolledBack)) != fromName) {
             throw IOException("Archive Drive renamed $fromName to $actual")
         }
         return null
@@ -369,7 +369,7 @@ class SafArchiveDrive(
         val mimeType: String?,
     )
 
-    private class SyncingOutputStream(
+    private class DurableOutputStream(
         private val descriptor: ParcelFileDescriptor,
     ) : OutputStream() {
         private val stream = ParcelFileDescriptor.AutoCloseOutputStream(descriptor)
