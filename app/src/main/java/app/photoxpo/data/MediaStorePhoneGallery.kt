@@ -50,6 +50,7 @@ class MediaStorePhoneGallery(
                 ?: throw IOException("Could not write a Loaded Original")
         } catch (error: Exception) {
             try {
+                // Removes only the unpublished pending row this app just inserted for a Load, never a person's photo.
                 resolver.delete(uri, null, null)
             } catch (_: Exception) {
             }
@@ -107,6 +108,7 @@ private class PendingLoadedFile(
 
     private fun deletePending() {
         try {
+            // Removes only the unpublished pending row this app just inserted for a Load, never a person's photo.
             resolver.delete(uri, null, null)
         } catch (_: Exception) {
         }
