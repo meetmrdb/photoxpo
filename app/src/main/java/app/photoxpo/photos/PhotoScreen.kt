@@ -1,12 +1,14 @@
 package app.photoxpo.photos
 
 import android.content.ActivityNotFoundException
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -179,7 +181,15 @@ private fun PhotoViewer(
     val loadState by produceState(initialValue = controller.state.value, controller) {
         controller.state.collect { value = it }
     }
-    val loadedUri = (loadState as? LoadUiState.Loaded)?.uri
+    // Reopening a photo starts a fresh Load state, so find the Original that is already on the phone.
+    val onPhoneUri by produceState<String?>(initialValue = null, photo.hash, photo.originalOnPhone) {
+        value = if (photo.originalOnPhone) {
+            withContext(Dispatchers.IO) { findOriginalOnPhone(context, photo) }
+        } else {
+            null
+        }
+    }
+    val loadedUri = (loadState as? LoadUiState.Loaded)?.uri ?: onPhoneUri
 
     val showOriginal = !loadedUri.isNullOrBlank()
     val previewOnly = !showOriginal && !photo.originalOnPhone
@@ -461,6 +471,42 @@ private fun WhereChip(text: String, onPhone: Boolean) {
             color = PhotoOverlay.OnScrim,
         )
     }
+}
+
+/**
+ * The Original that is on this phone for [photo]: the Camera item it came from, or the copy
+ * that Load published under "Photoxpo Loaded". Null when neither can be found.
+ */
+private fun findOriginalOnPhone(context: Context, photo: PhotoEntity): String? {
+    val resolver = context.contentResolver
+    val video = photo.kind.equals("video", ignoreCase = true)
+    val collection = if (video) {
+        MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+    } else {
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+    }
+    try {
+        photo.mediaId?.let { id ->
+            val uri = ContentUris.withAppendedId(collection, id)
+            resolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) return uri.toString()
+            }
+        }
+        resolver.query(
+            collection,
+            arrayOf(MediaStore.MediaColumns._ID),
+            "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+            arrayOf(photo.name, "%Photoxpo Loaded%"),
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                return ContentUris.withAppendedId(collection, cursor.getLong(0)).toString()
+            }
+        }
+    } catch (_: Exception) {
+        // No access or no such item: the Preview stays on screen.
+    }
+    return null
 }
 
 private fun shareOriginal(context: Context, uri: String) {
