@@ -245,7 +245,7 @@ class BackupController private constructor(
             finishAbandoned()
             return
         }
-        val alreadyBackedUp = settings.ledgerEntries().size
+        val alreadyBackedUp = backedUpOnThisPhone()
         val recorded = AtomicInteger(alreadyBackedUp)
         _state.update {
             it.runStarted(totalCount = total, fileCap = cap, driveStatus = it.driveStatus)
@@ -287,7 +287,7 @@ class BackupController private constructor(
                 result = outcome.result,
                 nowEpochMillis = System.currentTimeMillis(),
                 pauseReason = reason,
-            ).copy(driveStatus = outcome.driveStatus, backedUpCount = settings.ledgerEntries().size)
+            ).copy(driveStatus = outcome.driveStatus, backedUpCount = backedUpOnThisPhone())
         }
         persistLastBackedUp(outcome.result)
         runPostRunWork()
@@ -373,11 +373,25 @@ class BackupController private constructor(
         settings.setLastBackedUpAtEpochMillis(backedUpAt)
     }
 
+    /** Backed up photos that are still in the Camera folder, so the count never passes the total. */
+    private fun backedUpOnThisPhone(): Int {
+        val ledger = settings.ledgerEntries()
+        return try {
+            val present = MediaStoreSource(appContext).listCameraFolder().map { it.id }.toSet()
+            ledger.keys.count { it in present }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            ledger.size
+        }
+    }
+
     private fun progressLedger(recorded: AtomicInteger): BackedUpLedger {
         return object : BackedUpLedger {
             override fun record(mediaId: String, hash: String) {
+                // A run walks every photo again and re-confirms the old ones. Only a new one adds to the count.
+                val isNew = !settings.hasRecorded(mediaId)
                 settings.record(mediaId, hash)
-                _state.update { it.withBackedUpCount(recorded.incrementAndGet()) }
+                if (isNew) _state.update { it.withBackedUpCount(recorded.incrementAndGet()) }
             }
 
             override fun clear() {

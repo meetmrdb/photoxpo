@@ -93,6 +93,8 @@ class BackupSettingsStore(
         ledger.edit().putString(mediaId, hash).commit()
     }
 
+    fun hasRecorded(mediaId: String): Boolean = ledger.contains(mediaId)
+
     override fun clear() {
         ledger.edit().clear().commit()
     }
