@@ -122,6 +122,17 @@ class SafArchiveDriveInstrumentedTest {
     }
 
     @Test
+    fun appendText_keepsExistingLines() {
+        val drive = SafArchiveDrive(driveContext(), TestArchiveDocumentsProvider.treeUri())
+        val path = "Photoxpo/.photoxpo/runs/append.jsonl"
+        val first = "{\"type\":\"file\",\"hash\":\"aaa\",\"drivePath\":\"Photoxpo/Originals/a.jpg\"}\n"
+        val second = "{\"type\":\"file\",\"hash\":\"bbb\",\"drivePath\":\"Photoxpo/Originals/b.jpg\"}\n"
+        drive.appendText(path, first)
+        drive.appendText(path, second)
+        assertEquals(first + second, drive.readText(path))
+    }
+
+    @Test
     fun collision_keepsTheRequestedName() {
         val drive = SafArchiveDrive(driveContext(), TestArchiveDocumentsProvider.treeUri())
         val path = "Photoxpo/Originals/IMG.jpg"

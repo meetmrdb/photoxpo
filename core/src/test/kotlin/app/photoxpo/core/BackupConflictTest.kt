@@ -103,12 +103,98 @@ class BackupConflictTest {
         assertEquals(1, drive.writeCalls)
         assertArrayEquals(OLD_BYTES, drive.read(storedPath).use { it.readAllBytes() })
         assertFalse(drive.exists(otherPath))
+        val lines = fileLines(drive, result.manifestPath)
+        assertEquals(2, lines.size)
+        assertTrue(lines[0].contains("IMG_A.jpg"))
+        assertFalse(lines[0].contains("IMG_B.jpg"))
+        assertTrue(lines[1].contains("IMG_A.jpg"))
+        assertTrue(lines[1].contains("IMG_B.jpg"))
         val entry = ManifestReader().read(drive.readText(result.manifestPath)).entries.single()
         assertEquals(OLD_HASH, entry.hash)
         assertEquals(storedPath, entry.drivePath)
         assertEquals("IMG_A.jpg", entry.originalFilename)
         assertEquals(listOf("IMG_A.jpg", "IMG_B.jpg"), entry.originalFilenames)
-        assertEquals(1, fileLines(drive, result.manifestPath).size)
+        val summary = BackupHistoryReader().read(drive, emptySet()).single()
+        assertEquals(1L, summary.fileCount)
+        assertEquals(OLD_BYTES.size.toLong(), summary.bytes)
+    }
+
+    @Test
+    fun killRightAfterDuplicateNameLine_keepsEarlierCommittedLine() {
+        val root = folders.newFolder("duplicate-kill-after-line").toPath()
+        val drive = FakeArchiveDrive(root)
+        drive.faults = DriveFault(
+            step = DriveFaultStep.AFTER_MANIFEST_LINE,
+            error = DuplicatePathKill("after name line"),
+            occurrence = 2,
+        )
+        val first = photo("a", "IMG_A.jpg", "2019-04-01T00:00:00Z", OLD_BYTES)
+        val second = photo("b", "IMG_B.jpg", "2020-05-02T00:00:00Z", OLD_BYTES)
+        val thrown = runCatching {
+            startBackupRun(
+                FakeMediaSource(listOf(second, first)),
+                drive,
+                clock = fixed("2026-10-11T18:30:00Z"),
+                newDriveId = { "drive-dup-kill" },
+            )
+        }.exceptionOrNull()
+        assertTrue(thrown is DuplicatePathKill)
+
+        val manifest = "Photoxpo/.photoxpo/runs/${drive.list("Photoxpo/.photoxpo/runs").single()}"
+        val text = drive.readText(manifest)
+        val lines = text.lineSequence().filter { it.contains("\"type\":\"file\"") }.toList()
+        assertEquals(2, lines.size)
+        assertTrue(text.contains(lines[0] + "\n"))
+        assertTrue(text.contains(lines[1] + "\n"))
+        assertTrue(lines[0].contains("IMG_A.jpg"))
+        assertFalse(lines[0].contains("IMG_B.jpg"))
+        assertTrue(lines[1].contains("IMG_B.jpg"))
+        val entry = ManifestReader().read(text).entries.single()
+        assertEquals(listOf("IMG_A.jpg", "IMG_B.jpg"), entry.originalFilenames)
+        assertEquals("Photoxpo/Originals/2019/2019-04/IMG_A.jpg", entry.drivePath)
+        assertArrayEquals(OLD_BYTES, drive.read(entry.drivePath).use { it.readAllBytes() })
+    }
+
+    @Test
+    fun killAtEveryDuplicatePathStep_keepsTheEarlierCommittedLine() {
+        val first = photo("a", "IMG_A.jpg", "2019-04-01T00:00:00Z", OLD_BYTES)
+        val second = photo("b", "IMG_B.jpg", "2020-05-02T00:00:00Z", OLD_BYTES)
+        val probeRoot = folders.newFolder("duplicate-probe").toPath()
+        val probe = StepDrive(FakeArchiveDrive(probeRoot))
+        val probed = startBackupRun(
+            FakeMediaSource(listOf(second, first)),
+            probe,
+            clock = fixed("2026-10-11T18:30:00Z"),
+            newDriveId = { "drive-dup-steps" },
+        )
+        val fileSteps = probe.labels.indices.filter { probe.labels[it] == "file-line" }
+        assertEquals(2, fileSteps.size)
+        val firstLine = probe.readText(probed.manifestPath)
+            .lineSequence()
+            .first { it.contains("\"type\":\"file\"") }
+        val duplicateSteps = (fileSteps[0] + 1)..fileSteps[1]
+
+        for (index in duplicateSteps) {
+            val root = folders.newFolder("duplicate-step-$index").toPath()
+            val drive = StepDrive(FakeArchiveDrive(root), killAfter = index + 1)
+            val thrown = runCatching {
+                startBackupRun(
+                    FakeMediaSource(listOf(second, first)),
+                    drive,
+                    clock = fixed("2026-10-11T18:30:00Z"),
+                    newDriveId = { "drive-dup-steps" },
+                )
+            }.exceptionOrNull()
+            assertTrue(
+                "expected a kill after ${probe.labels[index]} but was $thrown",
+                thrown is DuplicatePathKill,
+            )
+            val text = drive.readText(probed.manifestPath)
+            assertTrue(
+                "kill after ${probe.labels[index]} (call ${index + 1}) lost an earlier committed line",
+                text.contains(firstLine + "\n"),
+            )
+        }
     }
 
     @Test
@@ -493,6 +579,49 @@ class BackupConflictTest {
             delegate.delete(path)
         }
     }
+
+    private class StepDrive(
+        private val delegate: ArchiveDrive,
+        private val killAfter: Int? = null,
+    ) : ArchiveDrive {
+        val labels = mutableListOf<String>()
+
+        override fun create(path: String): CreateResult = step("create") { delegate.create(path) }
+
+        override fun write(path: String): OutputStream = step("write") { delegate.write(path) }
+
+        override fun read(path: String): InputStream = step("read") { delegate.read(path) }
+
+        override fun byteCount(path: String): Long = step("byteCount") { delegate.byteCount(path) }
+
+        override fun rename(from: String, to: String): RenameResult = step("rename") { delegate.rename(from, to) }
+
+        override fun exists(path: String): Boolean = step("exists") { delegate.exists(path) }
+
+        override fun list(directory: String): List<String> = step("list") { delegate.list(directory) }
+
+        override fun readText(path: String): String = step("readText") { delegate.readText(path) }
+
+        override fun appendText(path: String, text: String) {
+            val label = if (text.contains("\"type\":\"file\"")) "file-line" else "append"
+            step(label) { delegate.appendText(path, text) }
+        }
+
+        override fun delete(path: String) {
+            step("delete") { delegate.delete(path) }
+        }
+
+        private fun <T> step(label: String, block: () -> T): T {
+            val value = block()
+            labels += label
+            if (killAfter != null && labels.size == killAfter) {
+                throw DuplicatePathKill(label)
+            }
+            return value
+        }
+    }
+
+    private class DuplicatePathKill(step: String) : RuntimeException("killed at $step")
 
     companion object {
         private val SAME_BYTES = byteArrayOf(0x00, 0x01, 0xFF.toByte(), 0x0A, 0x41)

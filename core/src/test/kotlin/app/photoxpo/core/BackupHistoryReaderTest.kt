@@ -83,6 +83,22 @@ class BackupHistoryReaderTest {
     }
 
     @Test
+    fun sameHashOnTwoLines_countsAsOneFile() {
+        val drive = drive()
+        val text = header("2026-10-11T18:30:00.000Z") + "\n" +
+            fileLine(hash = "abc", size = 4, name = "a.jpg") + "\n" +
+            fileLine(hash = "abc", size = 99, name = "b.jpg") + "\n" +
+            fileLine(hash = "def", size = 6, name = "c.jpg") + "\n" +
+            footer(elapsedMs = 120000, mbPerSecond = "1.25") + "\n"
+        drive.appendText("$RUNS/20261011T183000000Z.jsonl", text)
+
+        val summary = reader.read(drive, emptySet()).single()
+
+        assertEquals(2L, summary.fileCount)
+        assertEquals(10L, summary.bytes)
+    }
+
+    @Test
     fun footerIntegerSpeed_isCarried() {
         val drive = drive()
         val text = header("2026-10-11T18:30:00.000Z") + "\n" +

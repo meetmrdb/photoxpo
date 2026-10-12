@@ -4,8 +4,9 @@ package app.photoxpo.core
  * Reads Backup history from run files on the Archive Drive.
  *
  * A truncated last line is ignored. A run file with no footer is interrupted.
- * File count and bytes count committed file lines. Elapsed time and MB/s
- * are taken from the footer.
+ * File count and bytes count distinct hashes. A later line with the same
+ * hash adds a source name and does not count as another file. Elapsed time
+ * and MB/s are taken from the footer.
  */
 class BackupHistoryReader {
     /**
@@ -38,6 +39,7 @@ private fun summary(runFile: String, text: String): BackupRunSummary? {
     var footer: FooterFields? = null
     var fileCount = 0L
     var bytes = 0L
+    val countedHashes = HashSet<String>()
     for (raw in completeLines(text)) {
         val line = raw.trim()
         if (line.isEmpty()) continue
@@ -45,8 +47,11 @@ private fun summary(runFile: String, text: String): BackupRunSummary? {
         when (fields.text("type")) {
             "header" -> if (startedAt == null) startedAt = fields.text("startedAt")
             "file" -> if (fields.isCommittedFile()) {
-                fileCount += 1
-                bytes += fields.long("size") ?: 0L
+                val hash = fields.text("hash") ?: continue
+                if (countedHashes.add(hash)) {
+                    fileCount += 1
+                    bytes += fields.long("size") ?: 0L
+                }
             }
             "footer" -> footer = fields.toFooter()
         }

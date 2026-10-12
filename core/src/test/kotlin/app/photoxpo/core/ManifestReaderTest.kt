@@ -98,6 +98,25 @@ class ManifestReaderTest {
     }
 
     @Test
+    fun sameHashLines_mergeIntoOneEntry_andTheFirstDrivePathWins() {
+        val first = fileLine(hash = "abc", drivePath = "Photoxpo/Originals/2020/2020-01/a.jpg", size = 4, name = "a.jpg")
+        val second = "{\"type\":\"file\",\"hash\":\"abc\",\"drivePath\":\"Photoxpo/Originals/2020/2020-05/b.jpg\"," +
+            "\"size\":9,\"kind\":\"photo\",\"chosenDate\":\"2020-05-02\",\"sourceTag\":\"modified\"," +
+            "\"originalFilename\":\"b.jpg\",\"originalFilenames\":[\"b.jpg\"],\"previewFileName\":null}"
+        val other = fileLine(hash = "def", drivePath = "Photoxpo/Originals/2020/2020-06/c.jpg", size = 3, name = "c.jpg")
+        val text = header + "\n" + first + "\n" + second + "\n" + other + "\n"
+        val contents = ManifestReader().read(text)
+        assertEquals(2, contents.entries.size)
+        val merged = contents.entries[0]
+        assertEquals("abc", merged.hash)
+        assertEquals("Photoxpo/Originals/2020/2020-01/a.jpg", merged.drivePath)
+        assertEquals(4L, merged.size)
+        assertEquals("a.jpg", merged.originalFilename)
+        assertEquals(listOf("a.jpg", "b.jpg"), merged.originalFilenames)
+        assertEquals("c.jpg", contents.entries[1].originalFilename)
+    }
+
+    @Test
     fun originalFilenamesArray_listsEverySourceName() {
         val json = "{\"type\":\"file\",\"hash\":\"ab\",\"drivePath\":\"p\",\"size\":2," +
             "\"kind\":\"photo\",\"chosenDate\":\"2020-01-02\",\"sourceTag\":\"modified\"," +
