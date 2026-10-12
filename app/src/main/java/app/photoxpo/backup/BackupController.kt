@@ -275,11 +275,12 @@ class BackupController private constructor(
             // missing drive. Look at the drive before calling it a problem with an Original.
             val drive = withContext(Dispatchers.IO) { probeOrAbsent(uri) }
             if (drive != DriveStatus.Ready && !userStop.get()) {
+                val onPhone = backedUpOnThisPhone()
                 _state.update {
                     it.copy(
                         status = BackupStatus.Paused(PauseReason.DriveOut),
                         driveStatus = drive,
-                        backedUpCount = backedUpOnThisPhone(),
+                        backedUpCount = onPhone,
                         message = MESSAGE_DRIVE_OUT,
                     )
                 }
@@ -297,13 +298,14 @@ class BackupController private constructor(
             return
         }
         val reason = pauseReasonFor(outcome)
+        val onPhone = backedUpOnThisPhone()
         _state.update {
             reduceBackupRun(
                 state = it,
                 result = outcome.result,
                 nowEpochMillis = System.currentTimeMillis(),
                 pauseReason = reason,
-            ).copy(driveStatus = outcome.driveStatus, backedUpCount = backedUpOnThisPhone())
+            ).copy(driveStatus = outcome.driveStatus, backedUpCount = onPhone)
         }
         persistLastBackedUp(outcome.result)
         runPostRunWork()
@@ -390,9 +392,10 @@ class BackupController private constructor(
     }
 
     /** Backed up photos that are still in the Camera folder, so the count never passes the total. */
-    private fun backedUpOnThisPhone(): Int {
+    // MediaStore can stall for seconds while a pulled drive is torn down, so never ask it from the main thread.
+    private suspend fun backedUpOnThisPhone(): Int = withContext(Dispatchers.IO) {
         val ledger = settings.ledgerEntries()
-        return try {
+        try {
             val present = MediaStoreSource(appContext).listCameraFolder().map { it.id }.toSet()
             ledger.keys.count { it in present }
         } catch (error: Exception) {
