@@ -37,6 +37,8 @@ data class HomeUiModel(
     val accessWarning: HomeAccessWarning?,
     val driveConnected: Boolean = true,
     val driveFull: Boolean = false,
+    val spaceLine: String? = null,
+    val spaceWarning: String? = null,
     val driveChipLabel: String = "Drive connected",
     val showProgress: Boolean = false,
     val lastBackedUpDate: String? = null,
@@ -61,10 +63,31 @@ fun homeUiModel(
         accessWarning = homeAccessWarning(state.sessionAccess),
         driveConnected = state.driveStatus == DriveStatus.Ready,
         driveFull = state.status == BackupStatus.DriveFull,
+        spaceLine = spaceLine(state),
+        spaceWarning = spaceWarning(state),
         driveChipLabel = driveChipLabel(state.driveStatus),
         showProgress = state.status == BackupStatus.Running || state.status is BackupStatus.Paused,
         lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
     )
+}
+
+internal fun formatBytes(bytes: Long): String {
+    val gb = bytes / 1_000_000_000.0
+    if (gb >= 1.0) return String.format(Locale.US, "%.1f GB", gb)
+    return "${(bytes / 1_000_000L).coerceAtLeast(0)} MB"
+}
+
+private fun spaceLine(state: BackupUiState): String? {
+    val free = state.driveFreeBytes ?: return null
+    if (state.driveStatus != DriveStatus.Ready) return null
+    return "${formatBytes(free)} free on your Archive Drive"
+}
+
+private fun spaceWarning(state: BackupUiState): String? {
+    val free = state.driveFreeBytes ?: return null
+    val toCopy = state.bytesToCopy ?: return null
+    if (state.driveStatus != DriveStatus.Ready || toCopy <= free) return null
+    return "${formatBytes(toCopy)} still to back up, but only ${formatBytes(free)} is free on this drive"
 }
 
 private fun lastBackedUpDate(epochMillis: Long?, zone: ZoneId, locale: Locale): String? {

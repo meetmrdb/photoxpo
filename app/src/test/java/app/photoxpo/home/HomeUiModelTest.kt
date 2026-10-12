@@ -141,6 +141,26 @@ class HomeUiModelTest {
     }
 
     @Test
+    fun freeSpace_isShown_andWarnsWhenWhatIsLeftWillNotFit() {
+        val roomy = homeUiModel(
+            base(status = BackupStatus.Idle, driveStatus = DriveStatus.Ready)
+                .copy(driveFreeBytes = 3_300_000_000L, bytesToCopy = 1_000_000_000L),
+            NOW,
+        )
+        assertEquals("3.3 GB free on your Archive Drive", roomy.spaceLine)
+        assertEquals(null, roomy.spaceWarning)
+        val tight = homeUiModel(
+            base(status = BackupStatus.Idle, driveStatus = DriveStatus.Ready)
+                .copy(driveFreeBytes = 3_300_000_000L, bytesToCopy = 4_890_000_000L),
+            NOW,
+        )
+        assertEquals(
+            "4.9 GB still to back up, but only 3.3 GB is free on this drive",
+            tight.spaceWarning,
+        )
+    }
+
+    @Test
     fun done_offersAnotherCappedRun() {
         val model = homeUiModel(
             base(

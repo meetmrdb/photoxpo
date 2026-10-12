@@ -22,6 +22,7 @@ import app.photoxpo.data.SafArchiveDrive
 import app.photoxpo.data.hasAccessMediaLocation
 import app.photoxpo.data.hasFullMediaAccess
 import app.photoxpo.data.isPersistedTreeGrantHeld
+import app.photoxpo.data.archiveDriveFreeBytes
 import app.photoxpo.data.probeArchiveDrive
 import app.photoxpo.history.BackupHistoryRepository
 import app.photoxpo.photos.PhotosDatabase
@@ -182,6 +183,7 @@ class BackupController private constructor(
                 } finally {
                     settings.setRunActive(false)
                 }
+                refreshSpace()
             }
         }
     }
@@ -237,7 +239,10 @@ class BackupController private constructor(
                     status.reason == PauseReason.DriveOut &&
                     !userStop.get() -> scheduleResume()
             }
-            if (probed == DriveStatus.Ready) refreshLibraryWhenIdle()
+            if (probed == DriveStatus.Ready) {
+                refreshSpace()
+                refreshLibraryWhenIdle()
+            }
         }
     }
 
@@ -490,6 +495,23 @@ class BackupController private constructor(
                 sessionAccess = access,
                 message = sessionAccessMessage(access),
             )
+        }
+    }
+
+    /** How much room the Archive Drive has, and how much of the phone's Camera folder is still to copy. */
+    private suspend fun refreshSpace() {
+        val uri = settings.treeUri() ?: return
+        withContext(Dispatchers.IO) {
+            try {
+                val free = archiveDriveFreeBytes(appContext, uri)
+                val ledger = settings.ledgerEntries().keys
+                val toCopy = MediaStoreSource(appContext).listCameraFolder()
+                    .filter { it.id !in ledger }
+                    .sumOf { it.sizeBytes }
+                _state.update { it.copy(driveFreeBytes = free, bytesToCopy = toCopy) }
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+            }
         }
     }
 

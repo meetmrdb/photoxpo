@@ -101,6 +101,8 @@ data class BackupUiState(
     val fileCap: Int = DEFAULT_FILE_CAP,
     val message: String? = null,
     val sessionAccess: SessionAccess? = null,
+    val driveFreeBytes: Long? = null,
+    val bytesToCopy: Long? = null,
 )
 
 fun BackupUiState.runStarted(

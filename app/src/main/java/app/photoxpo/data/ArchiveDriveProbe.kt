@@ -2,6 +2,7 @@ package app.photoxpo.data
 
 import android.content.Context
 import android.net.Uri
+import android.os.StatFs
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import java.io.FileNotFoundException
@@ -69,5 +70,20 @@ private fun queryTree(context: Context, treeUri: Uri): TreeProbe {
         val write = flags and DocumentsContract.Document.FLAG_SUPPORTS_WRITE != 0
         val create = flags and DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE != 0
         return TreeProbe(found = true, supportsWrite = write || create)
+    }
+}
+
+/** Room left on the Archive Drive's volume, or null when the volume is not readable. */
+fun archiveDriveFreeBytes(context: Context, treeUri: Uri): Long? {
+    val rootId = treeRootId(treeUri) ?: return null
+    val manager = context.getSystemService(StorageManager::class.java) ?: return null
+    val volume = manager.storageVolumes.firstOrNull { candidate ->
+        if (rootId == "primary") candidate.isPrimary else candidate.uuid == rootId
+    } ?: return null
+    val directory = volume.directory ?: return null
+    return try {
+        StatFs(directory.path).availableBytes
+    } catch (_: Exception) {
+        null
     }
 }

@@ -159,6 +159,20 @@ fun HomeScreen(
                     }
                 }
             }
+            model.spaceLine?.let { line ->
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            model.spaceWarning?.let { warning ->
+                StatusChip(
+                    label = warning,
+                    icon = painterResource(R.drawable.ic_warning),
+                    tone = ChipTone.Warn,
+                )
+            }
             if (model.primaryPauses) {
                 FilledTonalButton(
                     onClick = onPrimary,
