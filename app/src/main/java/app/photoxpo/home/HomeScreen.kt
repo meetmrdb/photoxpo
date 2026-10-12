@@ -37,6 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -111,7 +118,7 @@ fun HomeScreen(
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = model.statusSentence,
+                    text = figuresInSans(model.statusSentence),
                     modifier = Modifier.semantics {
                         heading()
                         liveRegion = LiveRegionMode.Polite
@@ -364,4 +371,17 @@ private fun previewRunning(): HomeUiModel {
         ),
         nowEpochMillis = 5_000L + 60_000L,
     )
+}
+
+// Instrument Serif's "1" has no flag and reads as a lowercase L, so counts stay in the sans.
+private fun figuresInSans(sentence: String): AnnotatedString = buildAnnotatedString {
+    var last = 0
+    Regex("[0-9][0-9,]*").findAll(sentence).forEach { match ->
+        append(sentence.substring(last, match.range.first))
+        withStyle(
+            SpanStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium, fontSize = 30.sp),
+        ) { append(match.value) }
+        last = match.range.last + 1
+    }
+    append(sentence.substring(last))
 }

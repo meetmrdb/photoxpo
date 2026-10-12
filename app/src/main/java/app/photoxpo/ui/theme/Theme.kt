@@ -10,10 +10,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.photoxpo.R
 
 // The Quiet Shelf: one teal voice, warm amber for "waiting", red only for real failures.
 // Values come from DESIGN.md; edit them there first.
@@ -85,13 +87,16 @@ private val DarkColorScheme = darkColorScheme(
 
 private val Roboto = FontFamily.Default
 
+// The wordmark's own face, for the one headline per screen. Single weight, made for large sizes.
+private val InstrumentSerif = FontFamily(Font(R.font.instrument_serif))
+
 private val PhotoxpoTypography = Typography(
     headlineSmall = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Medium,
-        fontSize = 26.sp,
-        lineHeight = 31.sp,
-        letterSpacing = (-0.26).sp,
+        fontFamily = InstrumentSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 34.sp,
+        lineHeight = 38.sp,
+        letterSpacing = 0.sp,
     ),
     titleLarge = TextStyle(
         fontFamily = Roboto,

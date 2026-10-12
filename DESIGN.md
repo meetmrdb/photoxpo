@@ -41,11 +41,11 @@ colors:
   dark-on-warning-container: "#FFDEA1"
 typography:
   headline-small:
-    fontFamily: "Roboto, sans-serif"
-    fontSize: "26sp"
-    fontWeight: 500
-    lineHeight: 1.2
-    letterSpacing: "-0.01em"
+    fontFamily: "Instrument Serif, serif"
+    fontSize: "34sp"
+    fontWeight: 400
+    lineHeight: 1.12
+    letterSpacing: "0"
   title-large:
     fontFamily: "Roboto, sans-serif"
     fontSize: "22sp"
@@ -219,14 +219,14 @@ A cool, pale teal-white field with one deep teal accent, warm amber for "waiting
 
 ## Typography
 
-**Display Font:** Roboto (system face; theme in through the Material type scale)
+**Display Font:** Instrument Serif (the wordmark's own face, bundled, SIL OFL; headlines only, single weight)
 **Body Font:** Roboto
 **Label/Mono Font:** none
 
-**Character:** Plain, confident and large. Medium weights for status and actions, regular for explanation. No decorative faces, nothing smaller than 12 sp, and all sizes in `sp` so the system font-size setting works (the prototype has a 130% large-text mode that must hold without clipping).
+**Character:** Plain, confident and large. Medium weights for status and actions, regular for explanation. Instrument Serif appears only on the headline, never on controls or body, and its flagless "1" reads as a lowercase L, so figures inside a headline are set in Roboto Medium 30 sp. No other decorative faces, nothing smaller than 12 sp, and all sizes in `sp` so the system font-size setting works (the prototype has a 130% large-text mode that must hold without clipping).
 
 ### Hierarchy
-- **Headline Small** (500, 26 sp, 1.2 line height, -0.01em): The one status sentence on Home ("All 1,204 photos are on your drive"). Balanced wrapping.
+- **Headline Small** (Instrument Serif 400, 34 sp, 1.12 line height): The one status sentence on Home ("All 1,204 photos are on your drive"). Balanced wrapping.
 - **Title Large** (500, 22 sp, 1.25): Top app bar titles.
 - **Title Medium** (500, 16 sp, 1.4): Button labels, row card titles, the photo viewer title.
 - **Body Large** (400, 16 sp, 1.45): Explanations, onboarding copy, the load card's hint.
