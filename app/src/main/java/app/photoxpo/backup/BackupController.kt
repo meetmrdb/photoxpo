@@ -109,7 +109,7 @@ class BackupController private constructor(
         }
         _state.update {
             it.runStarted(totalCount = it.totalCount, fileCap = cap, driveStatus = drive)
-                .copy(sessionAccess = null)
+                .copy(sessionAccess = null, backedUpCount = it.backedUpCount)
         }
         try {
             ContextCompat.startForegroundService(
@@ -245,9 +245,11 @@ class BackupController private constructor(
             finishAbandoned()
             return
         }
-        val recorded = AtomicInteger(0)
+        val alreadyBackedUp = settings.ledgerEntries().size
+        val recorded = AtomicInteger(alreadyBackedUp)
         _state.update {
             it.runStarted(totalCount = total, fileCap = cap, driveStatus = it.driveStatus)
+                .copy(backedUpCount = alreadyBackedUp)
         }
         val outcome = try {
             withContext(Dispatchers.IO) {
@@ -285,7 +287,7 @@ class BackupController private constructor(
                 result = outcome.result,
                 nowEpochMillis = System.currentTimeMillis(),
                 pauseReason = reason,
-            ).copy(driveStatus = outcome.driveStatus)
+            ).copy(driveStatus = outcome.driveStatus, backedUpCount = settings.ledgerEntries().size)
         }
         persistLastBackedUp(outcome.result)
         runPostRunWork()
