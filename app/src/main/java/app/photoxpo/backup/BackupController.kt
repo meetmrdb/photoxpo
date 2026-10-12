@@ -31,6 +31,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -224,6 +225,12 @@ class BackupController private constructor(
                 probed != DriveStatus.Ready &&
                     (status is BackupStatus.Running || runJob?.isActive == true) &&
                     !userStop.get() -> pauseForDrive(probed)
+                // The copy failed first and the system only now says the drive is gone.
+                probed != DriveStatus.Ready &&
+                    status == BackupStatus.NeedsAttention &&
+                    !userStop.get() -> _state.update {
+                    it.copy(status = BackupStatus.Paused(PauseReason.DriveOut), message = MESSAGE_DRIVE_OUT)
+                }
                 probed == DriveStatus.Ready &&
                     status is BackupStatus.Paused &&
                     status.reason == PauseReason.DriveOut &&
@@ -296,16 +303,21 @@ class BackupController private constructor(
             }
         } catch (error: Exception) {
             if (error is CancellationException) throw error
-            // A cable pulled in the middle of a copy can surface as a plain I/O error, not as a
-            // missing drive. Look at the drive before calling it a problem with an Original.
-            val drive = withContext(Dispatchers.IO) { probeOrAbsent(uri) }
+            // A cable pulled in the middle of a copy can surface as a plain I/O error, and the system
+            // may take a few seconds to say the drive is gone. Give it that time before calling this
+            // a problem with an Original.
+            val drive = withContext(Dispatchers.IO) { probeUntilGone(uri) }
+            val onPhone = backedUpOnThisPhone()
+            val copiedSome = onPhone > alreadyBackedUp
+            val now = System.currentTimeMillis()
+            if (copiedSome) settings.setLastBackedUpAtEpochMillis(now)
             if (drive != DriveStatus.Ready && !userStop.get()) {
-                val onPhone = backedUpOnThisPhone()
                 _state.update {
                     it.copy(
                         status = BackupStatus.Paused(PauseReason.DriveOut),
                         driveStatus = drive,
                         backedUpCount = onPhone,
+                        lastBackedUpAtEpochMillis = if (copiedSome) now else it.lastBackedUpAtEpochMillis,
                         message = MESSAGE_DRIVE_OUT,
                     )
                 }
@@ -316,6 +328,8 @@ class BackupController private constructor(
                 it.copy(
                     status = BackupStatus.NeedsAttention,
                     driveStatus = drive,
+                    backedUpCount = onPhone,
+                    lastBackedUpAtEpochMillis = if (copiedSome) now else it.lastBackedUpAtEpochMillis,
                     message = error.message ?: MESSAGE_NEEDS_ATTENTION,
                 )
             }
@@ -474,6 +488,17 @@ class BackupController private constructor(
         }
     }
 
+    /** The first probe after a pull can still say Ready, so look a few times before believing it. */
+    private suspend fun probeUntilGone(uri: Uri): DriveStatus {
+        var status = probeOrAbsent(uri)
+        repeat(DRIVE_GONE_PROBES) {
+            if (status != DriveStatus.Ready) return status
+            delay(DRIVE_GONE_PROBE_GAP_MS)
+            status = probeOrAbsent(uri)
+        }
+        return status
+    }
+
     private fun probeOrAbsent(uri: Uri): DriveStatus {
         return try {
             probeArchiveDrive(appContext, uri)
@@ -521,6 +546,8 @@ class BackupController private constructor(
     )
 
     companion object {
+        private const val DRIVE_GONE_PROBES = 8
+        private const val DRIVE_GONE_PROBE_GAP_MS = 750L
         private const val WAKE_LOCK_TAG = "app.photoxpo:backup-run"
         private const val WAKE_LOCK_LIMIT_MS = 8L * 60L * 60L * 1000L
 
