@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -71,15 +72,20 @@ fun HomeScreen(
     val canStart = model.primaryPauses || model.driveConnected
 
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "Photoxpo",
+        Box(
             modifier = Modifier
                 .defaultMinSize(minHeight = 64.dp)
                 .padding(horizontal = 20.dp)
-                .wrapContentHeight(Alignment.CenterVertically)
                 .semantics { heading() },
-            style = MaterialTheme.typography.titleLarge,
-        )
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_logo_full),
+                contentDescription = "Photoxpo",
+                modifier = Modifier.height(40.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+        }
         Column(
             modifier = Modifier
                 .weight(1f)
