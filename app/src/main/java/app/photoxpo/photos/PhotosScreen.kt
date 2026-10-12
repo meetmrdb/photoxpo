@@ -1,6 +1,18 @@
 package app.photoxpo.photos
 
 import androidx.compose.foundation.background
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,6 +90,7 @@ fun PhotosGrid(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
+    var byDay by rememberSaveable { mutableStateOf(false) }
     Column(modifier = modifier.fillMaxSize().padding(contentPadding)) {
         Text(
             text = "Photos",
@@ -91,62 +104,92 @@ fun PhotosGrid(
         if (photos.isEmpty()) {
             EmptyPhotos()
         } else {
-            GroupedGrid(photos = photos, previewCache = previewCache, onOpenPhoto = onOpenPhoto)
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+            ) {
+                SegmentedButton(
+                    selected = !byDay,
+                    onClick = { byDay = false },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                ) {
+                    Text("Months")
+                }
+                SegmentedButton(
+                    selected = byDay,
+                    onClick = { byDay = true },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                ) {
+                    Text("Days")
+                }
+            }
+            GroupedGrid(
+                photos = photos,
+                byDay = byDay,
+                previewCache = previewCache,
+                onOpenPhoto = onOpenPhoto,
+            )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GroupedGrid(
     photos: List<PhotoEntity>,
+    byDay: Boolean,
     previewCache: PreviewBitmapCache,
     onOpenPhoto: (String) -> Unit,
 ) {
     val zone = remember { ZoneId.systemDefault() }
     val locale = Locale.getDefault()
-    val groups = remember(photos, zone, locale) { groupByMonth(photos, zone, locale) }
-    val wide = LocalConfiguration.current.screenWidthDp >= 600
-    LazyVerticalGrid(
-        columns = if (wide) GridCells.Adaptive(minSize = 128.dp) else GridCells.Fixed(3),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        for (group in groups) {
-            item(
-                key = "header-${group.label}",
-                span = { GridItemSpan(maxLineSpan) },
-                contentType = "header",
-            ) {
-                Text(
-                    text = group.label,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 13.dp, end = 13.dp, top = 20.dp, bottom = 8.dp)
-                        .semantics { heading() },
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            items(
-                items = group.photos,
-                key = { photo -> photo.hash },
-                contentType = { "photo" },
-            ) { photo ->
-                PhotoTile(
-                    photo = photo,
-                    previewCache = previewCache,
-                    onClick = { onOpenPhoto(photo.hash) },
-                )
-            }
-        }
-        item(
-            key = "legend",
-            span = { GridItemSpan(maxLineSpan) },
-            contentType = "legend",
+    val groups = remember(photos, byDay, zone, locale) {
+        if (byDay) groupByDay(photos, zone, locale) else groupByMonth(photos, zone, locale)
+    }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val columns = if (maxWidth >= 600.dp) (maxWidth / 128.dp).toInt() else 3
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 3.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Legend()
+            for (group in groups) {
+                stickyHeader(key = "header-${group.label}", contentType = "header") {
+                    Text(
+                        text = group.label,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.background)
+                            .padding(start = 13.dp, end = 13.dp, top = 16.dp, bottom = 8.dp)
+                            .semantics { heading() },
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                items(
+                    items = group.photos.chunked(columns),
+                    key = { row -> "row-${group.label}-${row.first().hash}" },
+                    contentType = { "photo-row" },
+                ) { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        for (photo in row) {
+                            PhotoTile(
+                                photo = photo,
+                                previewCache = previewCache,
+                                onClick = { onOpenPhoto(photo.hash) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        repeat(columns - row.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+            item(key = "legend", contentType = "legend") {
+                Legend()
+            }
         }
     }
 }
@@ -215,10 +258,11 @@ private fun PhotoTile(
     photo: PhotoEntity,
     previewCache: PreviewBitmapCache,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val isVideo = photo.kind.equals("video", ignoreCase = true)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(2.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)

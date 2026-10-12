@@ -102,3 +102,26 @@ private fun sample(hash: String, chosenDate: String?): PhotoEntity {
         originalOnPhone = false,
     )
 }
+
+class PhotoDayGroupsTest {
+    private fun photo(hash: String, date: String?) = PhotoEntity(
+        hash = hash, mediaId = null, name = "$hash.jpg", chosenDate = date, sourceTag = null,
+        kind = "photo", sizeBytes = 1, drivePath = null, backedUp = true, previewFile = null,
+        originalOnThisDrive = true, originalOnPhone = false,
+    )
+
+    @org.junit.Test
+    fun groupsNewestDayFirst_andPutsUndatedLast() {
+        val groups = groupByDay(
+            listOf(
+                photo("a", "2026-10-01"),
+                photo("b", "2026-10-11"),
+                photo("c", "2026-10-11"),
+                photo("d", null),
+            ),
+            java.time.ZoneOffset.UTC,
+        )
+        org.junit.Assert.assertEquals(listOf("11 October 2026", "1 October 2026", "No date"), groups.map { it.label })
+        org.junit.Assert.assertEquals(2, groups[0].photos.size)
+    }
+}

@@ -3,6 +3,15 @@ package app.photoxpo.history
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.foundation.background
+import app.photoxpo.photos.groupByMonth
+import app.photoxpo.photos.PreviewImage
+import app.photoxpo.photos.PreviewBitmapCache
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -85,6 +94,8 @@ fun HistoryRoute(
     var driveAttached by remember { mutableStateOf(false) }
     var lastConnectedAtEpochMillis by remember { mutableStateOf<Long?>(null) }
     var loaded by remember { mutableStateOf(false) }
+    var strips by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+    val previewCache = remember { PreviewBitmapCache() }
     val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -95,6 +106,7 @@ fun HistoryRoute(
             job = scope.launch {
                 val cached = repository.cached()
                 summaries = cached
+                strips = withContext(Dispatchers.IO) { monthStrips(appContext, zone, locale) }
                 lastConnectedAtEpochMillis = repository.lastConnectedAtEpochMillis()
                 loaded = true
                 val drive = withContext(Dispatchers.IO) { openAttachedArchiveDrive(appContext) }
@@ -143,7 +155,20 @@ fun HistoryRoute(
         onGrouping = { grouping = it },
         onBack = onBack,
         modifier = modifier,
+        strips = strips,
+        previewCache = previewCache,
     )
+}
+
+/** Up to four Preview hashes per month label, newest first, for the month thumbnail strips. */
+private suspend fun monthStrips(
+    context: Context,
+    zone: ZoneId,
+    locale: Locale,
+): Map<String, List<String>> {
+    val photos = PhotosDatabase.get(context).photoDao().all()
+    return groupByMonth(photos, zone, locale)
+        .associate { group -> group.label to group.photos.take(4).map { it.hash } }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -153,6 +178,8 @@ fun HistoryScreen(
     onGrouping: (HistoryGrouping) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    strips: Map<String, List<String>> = emptyMap(),
+    previewCache: PreviewBitmapCache? = null,
 ) {
     Scaffold(
         modifier = modifier,
@@ -196,7 +223,7 @@ fun HistoryScreen(
                         } else {
                             for (section in model.sections) {
                                 item(key = "month-${section.monthLabel}") {
-                                    MonthHeading(section)
+                                    MonthHeading(section, strips[section.monthLabel], previewCache)
                                 }
                                 items(
                                     items = section.rows,
@@ -273,21 +300,50 @@ private fun AsOfNote(label: String) {
 }
 
 @Composable
-private fun MonthHeading(section: HistoryMonthSection) {
-    Column(
+private fun MonthHeading(
+    section: HistoryMonthSection,
+    stripHashes: List<String>?,
+    previewCache: PreviewBitmapCache?,
+) {
+    Row(
         modifier = Modifier.padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = section.monthLabel,
-            modifier = Modifier.semantics { heading() },
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Text(
-            text = section.totalsLabel,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (!stripHashes.isNullOrEmpty() && previewCache != null) {
+            Row(
+                modifier = Modifier
+                    .width(if (stripHashes.size >= 3) 112.dp else (56 * stripHashes.size).dp)
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(10.dp)),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                for (hash in stripHashes) {
+                    PreviewImage(
+                        hash = hash,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        cache = previewCache,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        maxEdge = 160,
+                    )
+                }
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = section.monthLabel,
+                modifier = Modifier.semantics { heading() },
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = section.totalsLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

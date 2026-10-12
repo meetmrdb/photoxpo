@@ -52,6 +52,8 @@ fun historyUiModel(
     zone: ZoneId,
     locale: Locale = Locale.ENGLISH,
 ): HistoryUiModel {
+    // A run that found nothing new to copy has nothing worth listing.
+    val summaries = summaries.filter { it.fileCount > 0 }
     val rows = byBackup(summaries).map { backupRow(it, zone, locale) }
     val sections = if (grouping == HistoryGrouping.ByMonth) {
         byMonth(summaries).map { group ->

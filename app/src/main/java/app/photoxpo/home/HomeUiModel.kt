@@ -1,5 +1,9 @@
 package app.photoxpo.home
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import app.photoxpo.backup.BackupStatus
 import app.photoxpo.backup.BackupUiState
 import app.photoxpo.backup.PauseReason
@@ -34,11 +38,14 @@ data class HomeUiModel(
     val driveConnected: Boolean = true,
     val driveChipLabel: String = "Drive connected",
     val showProgress: Boolean = false,
+    val lastBackedUpDate: String? = null,
 )
 
 fun homeUiModel(
     state: BackupUiState,
     nowEpochMillis: Long,
+    zone: ZoneId = ZoneId.systemDefault(),
+    locale: Locale = Locale.getDefault(),
 ): HomeUiModel {
     val lastBackedUpLine = lastBackedUpLine(state.lastBackedUpAtEpochMillis, nowEpochMillis)
     return HomeUiModel(
@@ -54,7 +61,16 @@ fun homeUiModel(
         driveConnected = state.driveStatus == DriveStatus.Ready,
         driveChipLabel = driveChipLabel(state.driveStatus),
         showProgress = state.status == BackupStatus.Running || state.status is BackupStatus.Paused,
+        lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
     )
+}
+
+private fun lastBackedUpDate(epochMillis: Long?, zone: ZoneId, locale: Locale): String? {
+    epochMillis ?: return null
+    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a", locale)
+    return formatter.format(Instant.ofEpochMilli(epochMillis).atZone(zone))
+        .replace("AM", "am")
+        .replace("PM", "pm")
 }
 
 private fun driveChipLabel(status: DriveStatus): String {

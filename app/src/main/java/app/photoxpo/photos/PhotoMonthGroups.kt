@@ -49,6 +49,48 @@ fun groupByMonth(
     return groups
 }
 
+/**
+ * Groups [photos] under day labels such as "11 October 2026".
+ * The newest day comes first. Photos with no readable date go in a final "No date" group.
+ */
+fun groupByDay(
+    photos: List<PhotoEntity>,
+    zone: ZoneId,
+    locale: Locale = Locale.ENGLISH,
+): List<PhotoMonthGroup> {
+    if (photos.isEmpty()) return emptyList()
+    val formatter = DateTimeFormatter.ofPattern("d MMMM yyyy", locale)
+    val dated = photos.map { photo ->
+        DatedDay(
+            photo = photo,
+            day = chosenLocalDate(photo.chosenDate, zone),
+            sortMillis = chosenSortMillis(photo.chosenDate, zone),
+        )
+    }
+    val byDay = dated.groupBy { it.day }
+    val groups = ArrayList<PhotoMonthGroup>(byDay.size)
+    for (day in byDay.keys.filterNotNull().sortedDescending()) {
+        val rows = byDay.getValue(day).sortedWith(
+            compareByDescending<DatedDay> { it.sortMillis ?: Long.MIN_VALUE }.thenBy { it.photo.hash },
+        )
+        groups += PhotoMonthGroup(label = day.format(formatter), photos = rows.map { it.photo })
+    }
+    val undated = byDay[null]
+    if (!undated.isNullOrEmpty()) {
+        groups += PhotoMonthGroup(
+            label = "No date",
+            photos = undated.sortedBy { it.photo.hash }.map { it.photo },
+        )
+    }
+    return groups
+}
+
+private data class DatedDay(
+    val photo: PhotoEntity,
+    val day: java.time.LocalDate?,
+    val sortMillis: Long?,
+)
+
 private data class DatedPhoto(
     val photo: PhotoEntity,
     val month: YearMonth?,
