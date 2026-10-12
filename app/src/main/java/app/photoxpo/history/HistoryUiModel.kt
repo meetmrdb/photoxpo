@@ -22,6 +22,7 @@ data class HistoryBackupRow(
     val sizeLabel: String,
     val speedLabel: String?,
     val stoppedEarlyLabel: String?,
+    val checked: Boolean = false,
 )
 
 data class HistoryMonthSection(
@@ -79,6 +80,7 @@ private fun backupRow(summary: BackupRunSummary, zone: ZoneId, locale: Locale): 
         sizeLabel = sizeLabel(summary.bytes),
         speedLabel = if (summary.interrupted) null else speedLabel(summary.mbPerSecond),
         stoppedEarlyLabel = if (summary.interrupted) "Stopped early" else null,
+        checked = summary.checked && !summary.interrupted,
     )
 }
 

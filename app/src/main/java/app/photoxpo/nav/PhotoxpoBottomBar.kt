@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -37,6 +39,44 @@ fun PhotoxpoBottomBar(
             alwaysShowLabel = true,
         )
         NavigationBarItem(
+            selected = currentRoute == AppRoutes.Photos,
+            onClick = onPhotos,
+            icon = {
+                Icon(
+                    painter = painterResource(R.drawable.ic_nav_photos),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                )
+            },
+            label = { BarLabel("Photos") },
+            alwaysShowLabel = true,
+        )
+    }
+}
+
+/** The same two destinations as a rail, for windows at least 600 dp wide. */
+@Composable
+fun PhotoxpoRail(
+    currentRoute: String?,
+    onHome: () -> Unit,
+    onPhotos: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    NavigationRail(modifier = modifier) {
+        NavigationRailItem(
+            selected = currentRoute == AppRoutes.Home,
+            onClick = onHome,
+            icon = {
+                Icon(
+                    painter = painterResource(R.drawable.ic_nav_home),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                )
+            },
+            label = { BarLabel("Home") },
+            alwaysShowLabel = true,
+        )
+        NavigationRailItem(
             selected = currentRoute == AppRoutes.Photos,
             onClick = onPhotos,
             icon = {

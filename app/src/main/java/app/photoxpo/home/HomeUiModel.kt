@@ -31,6 +31,9 @@ data class HomeUiModel(
     val offlineBanner: HomeOfflineBanner?,
     val showDriveMismatch: Boolean,
     val accessWarning: HomeAccessWarning?,
+    val driveConnected: Boolean = true,
+    val driveChipLabel: String = "Drive connected",
+    val showProgress: Boolean = false,
 )
 
 fun homeUiModel(
@@ -48,7 +51,18 @@ fun homeUiModel(
         offlineBanner = offlineBanner(state, lastBackedUpLine),
         showDriveMismatch = state.status == BackupStatus.DriveMismatch,
         accessWarning = homeAccessWarning(state.sessionAccess),
+        driveConnected = state.driveStatus == DriveStatus.Ready,
+        driveChipLabel = driveChipLabel(state.driveStatus),
+        showProgress = state.status == BackupStatus.Running || state.status is BackupStatus.Paused,
     )
+}
+
+private fun driveChipLabel(status: DriveStatus): String {
+    return when (status) {
+        DriveStatus.Ready -> "Drive connected"
+        DriveStatus.Absent -> "Drive not connected"
+        DriveStatus.ReadOnly -> "Can't copy to this drive"
+    }
 }
 
 fun homeAccessWarning(access: SessionAccess?): HomeAccessWarning? {

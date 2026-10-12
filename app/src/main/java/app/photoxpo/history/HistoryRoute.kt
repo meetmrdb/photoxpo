@@ -2,7 +2,14 @@ package app.photoxpo.history
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -172,13 +179,7 @@ fun HistoryScreen(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                model.asOfLabel?.let { label ->
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                model.asOfLabel?.let { label -> AsOfNote(label) }
                 GroupingToggle(grouping = model.grouping, onGrouping = onGrouping)
             }
             LazyColumn(
@@ -248,15 +249,23 @@ private fun GroupingToggle(
 }
 
 @Composable
-private fun MonthHeading(section: HistoryMonthSection) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = section.monthLabel,
-            modifier = Modifier.semantics { heading() },
-            style = MaterialTheme.typography.titleLarge,
+private fun AsOfNote(label: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_info),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp),
         )
         Text(
-            text = section.totalsLabel,
+            text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -264,40 +273,91 @@ private fun MonthHeading(section: HistoryMonthSection) {
 }
 
 @Composable
+private fun MonthHeading(section: HistoryMonthSection) {
+    Column(
+        modifier = Modifier.padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = section.monthLabel,
+            modifier = Modifier.semantics { heading() },
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Text(
+            text = section.totalsLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun BackupRow(row: HistoryBackupRow) {
+    val colors = MaterialTheme.colorScheme
+    val stopped = row.stoppedEarlyLabel != null
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = colors.surfaceContainerHigh,
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.Top,
         ) {
-            Text(
-                text = row.dateLabel,
-                style = MaterialTheme.typography.titleMedium,
-            )
-            row.stoppedEarlyLabel?.let { label ->
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLarge,
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        if (stopped) colors.tertiaryContainer else colors.primaryContainer,
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(
+                        if (stopped) R.drawable.ic_schedule else R.drawable.ic_check_circle,
+                    ),
+                    contentDescription = null,
+                    tint = if (stopped) colors.onTertiaryContainer else colors.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp),
                 )
             }
-            Text(
-                text = row.filesLabel,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                text = row.sizeLabel,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            row.speedLabel?.let { speed ->
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(text = row.dateLabel, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = speed,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = "${row.filesLabel}, ${row.sizeLabel}",
+                    style = MaterialTheme.typography.bodyLarge,
                 )
+                row.stoppedEarlyLabel?.let { label ->
+                    Text(
+                        text = label,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .background(colors.tertiaryContainer, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = colors.onTertiaryContainer,
+                    )
+                }
+                if (row.checked) {
+                    Text(
+                        text = "Backed up and checked",
+                        modifier = Modifier.padding(top = 4.dp),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = colors.primary,
+                    )
+                }
+                row.speedLabel?.let { speed ->
+                    Text(
+                        text = speed,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

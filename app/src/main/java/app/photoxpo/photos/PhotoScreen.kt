@@ -1,6 +1,8 @@
 package app.photoxpo.photos
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.media.MediaMetadataRetriever
@@ -10,6 +12,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import app.photoxpo.ui.theme.PhotoOverlay
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -167,6 +181,15 @@ private fun PhotoViewer(
     }
     val loadedUri = (loadState as? LoadUiState.Loaded)?.uri
 
+    val showOriginal = !loadedUri.isNullOrBlank()
+    val previewOnly = !showOriginal && !photo.originalOnPhone
+    val blur by animateDpAsState(
+        targetValue = if (previewOnly) 3.dp else 0.dp,
+        animationSpec = tween(durationMillis = 900),
+        label = "previewBlur",
+    )
+    val isVideo = photo.kind.equals("video", ignoreCase = true)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -174,31 +197,76 @@ private fun PhotoViewer(
     ) {
         PreviewImage(
             hash = photo.hash,
-            contentDescription = if (loadedUri.isNullOrBlank()) photo.name else null,
+            contentDescription = if (showOriginal) null else photo.name,
             contentScale = ContentScale.Fit,
             cache = previewCache,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(blur, BlurredEdgeTreatment.Unbounded),
         )
-        if (!loadedUri.isNullOrBlank()) {
+        if (showOriginal) {
             LoadedOriginalImage(
-                uri = loadedUri,
+                uri = loadedUri.orEmpty(),
                 contentDescription = photo.name,
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        PhotoTopBar(
-            onBack = onBack,
-            onInfo = { showInfo = true },
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
-        Box(
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(PhotoOverlay.TopGradient, Color.Transparent)))
+                .statusBarsPadding()
+                .padding(start = 4.dp, end = 12.dp, top = 4.dp, bottom = 24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_back),
+                    contentDescription = "Back",
+                    tint = PhotoOverlay.OnScrim,
+                )
+            }
+            Text(
+                text = (if (isVideo) "Video" else "Photo") + " · " + info.date,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                color = PhotoOverlay.OnScrim,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (previewOnly) {
+                Text(
+                    text = "Preview",
+                    modifier = Modifier
+                        .background(PhotoOverlay.Scrim, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = PhotoOverlay.OnScrim,
+                )
+            }
+        }
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, PhotoOverlay.BottomGradient)))
                 .navigationBarsPadding()
-                .padding(24.dp),
+                .padding(start = 16.dp, end = 16.dp, top = 56.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            LoadSlot(photo = photo, repository = repository, controller = controller)
+            WhereChip(text = info.whereTheOriginalIs, onPhone = photo.originalOnPhone || showOriginal)
+            LoadSlot(
+                photo = photo,
+                repository = repository,
+                controller = controller,
+                onInfo = { showInfo = true },
+                onShare = if (showOriginal) {
+                    { shareOriginal(context, loadedUri.orEmpty()) }
+                } else {
+                    null
+                },
+            )
         }
     }
 
@@ -359,5 +427,45 @@ private fun InfoRow(label: String, value: String) {
             text = value,
             style = MaterialTheme.typography.bodyLarge,
         )
+    }
+}
+
+@Composable
+private fun WhereChip(text: String, onPhone: Boolean) {
+    Row(
+        modifier = Modifier
+            .background(
+                if (onPhone) PhotoOverlay.TealChip else PhotoOverlay.Scrim,
+                RoundedCornerShape(10.dp),
+            )
+            .padding(start = 10.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_archive_drive),
+            contentDescription = null,
+            tint = PhotoOverlay.OnScrim,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            color = PhotoOverlay.OnScrim,
+        )
+    }
+}
+
+private fun shareOriginal(context: Context, uri: String) {
+    val parsed = Uri.parse(uri)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = context.contentResolver.getType(parsed) ?: "*/*"
+        putExtra(Intent.EXTRA_STREAM, parsed)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(Intent.createChooser(send, null))
+    } catch (_: ActivityNotFoundException) {
+        // No app on this phone can take a shared file.
     }
 }

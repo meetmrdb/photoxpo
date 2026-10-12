@@ -1,0 +1,344 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-12T08:02:20.225906Z",
+  "title": "Design System: Photoxpo",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Deep Harbour Teal",
+        "canonical": "#0B5C63",
+        "tonalRamp": [
+          "#084045",
+          "#0D7179",
+          "#13A1AE",
+          "#19D2E2",
+          "#4BDEEB",
+          "#7FE8F1",
+          "#B4F1F7",
+          "#E8FBFC"
+        ]
+      },
+      "primary-container": {
+        "role": "primary",
+        "displayName": "Sea Glass",
+        "canonical": "#C4EBEA",
+        "tonalRamp": [
+          "#133938",
+          "#226563",
+          "#31908E",
+          "#40BCB9",
+          "#69CCCA",
+          "#95DBD9",
+          "#C0EAE9",
+          "#ECF9F8"
+        ]
+      },
+      "secondary-container": {
+        "role": "secondary",
+        "displayName": "Quiet Tonal Teal",
+        "canonical": "#CCE8E5",
+        "tonalRamp": [
+          "#183532",
+          "#2A5D57",
+          "#3C857D",
+          "#4EADA3",
+          "#75C1B9",
+          "#9DD3CD",
+          "#C5E5E2",
+          "#EDF7F6"
+        ]
+      },
+      "warning-container": {
+        "role": "tertiary",
+        "displayName": "Waiting Amber",
+        "canonical": "#FFDEA1",
+        "tonalRamp": [
+          "#4C3200",
+          "#875700",
+          "#C17D00",
+          "#FBA300",
+          "#FFB937",
+          "#FFCD71",
+          "#FFE2AB",
+          "#FFF6E5"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Pale Reef",
+        "canonical": "#F6FAF9",
+        "tonalRamp": [
+          "#1B312C",
+          "#30574D",
+          "#457C6E",
+          "#5AA290",
+          "#7EB7A9",
+          "#A4CCC2",
+          "#C9E1DB",
+          "#EFF6F4"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Sea Mist",
+        "canonical": "#EAF1F0",
+        "tonalRamp": [
+          "#1F2E2C",
+          "#36514D",
+          "#4D746E",
+          "#659790",
+          "#87AFA9",
+          "#AAC6C2",
+          "#CDDDDB",
+          "#F0F5F4"
+        ]
+      },
+      "on-surface": {
+        "role": "neutral",
+        "displayName": "Ink Teal",
+        "canonical": "#161D1D",
+        "tonalRamp": [
+          "#212B2B",
+          "#3A4D4D",
+          "#536E6E",
+          "#6C8F8F",
+          "#8DA9A9",
+          "#AEC2C2",
+          "#CFDBDB",
+          "#F0F4F4"
+        ]
+      },
+      "on-surface-variant": {
+        "role": "neutral",
+        "displayName": "Slate Teal",
+        "canonical": "#3F4948",
+        "tonalRamp": [
+          "#232928",
+          "#3E4847",
+          "#596866",
+          "#748785",
+          "#93A2A1",
+          "#B3BDBC",
+          "#D2D8D8",
+          "#F1F3F3"
+        ]
+      },
+      "error": {
+        "role": "error",
+        "displayName": "Signal Red",
+        "canonical": "#B3261E",
+        "tonalRamp": [
+          "#420E0B",
+          "#731913",
+          "#A5231C",
+          "#D72E24",
+          "#E25B53",
+          "#EB8B85",
+          "#F3BAB7",
+          "#FBEAE9"
+        ]
+      },
+      "dark-primary": {
+        "role": "primary",
+        "displayName": "Lagoon Mint",
+        "canonical": "#7BD5DA",
+        "tonalRamp": [
+          "#11393C",
+          "#1E6569",
+          "#2A9197",
+          "#37BDC4",
+          "#63CDD3",
+          "#90DCE0",
+          "#BEEAED",
+          "#EBF9F9"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline-small": {
+        "displayName": "Headline Small",
+        "purpose": "The one status sentence on Home."
+      },
+      "title-medium": {
+        "displayName": "Title Medium",
+        "purpose": "Buttons, row titles, viewer title."
+      },
+      "body-large": {
+        "displayName": "Body Large",
+        "purpose": "Explanations and onboarding copy."
+      },
+      "label-medium": {
+        "displayName": "Label Medium",
+        "purpose": "Nav labels, ring actions, tags."
+      }
+    },
+    "shadows": [
+      {
+        "name": "none",
+        "value": "none",
+        "purpose": "Chrome is flat; depth is tonal."
+      },
+      {
+        "name": "viewer-top-gradient",
+        "value": "linear-gradient(#000b,#0000)",
+        "purpose": "Keeps title legible on photos."
+      },
+      {
+        "name": "viewer-bottom-gradient",
+        "value": "linear-gradient(#0000,#000c 45%)",
+        "purpose": "Keeps chip and ring actions legible."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "Sharpen (0.9s) and rise (0.35s) on the photo viewer."
+      },
+      {
+        "name": "progress-linear",
+        "value": "width .3s linear",
+        "purpose": "Progress fill."
+      },
+      {
+        "name": "reduce-motion",
+        "value": "none",
+        "purpose": "All animation drops to an instant cut."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "<600dp (navigation bar)"
+      },
+      {
+        "name": "expanded",
+        "value": ">=840dp (navigation rail)"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action on a screen.",
+      "html": "<button class=\"ds-btn\">Back up 142 new photos</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:0 24px;border-radius:28px;border:0;font:500 16px Roboto,sans-serif;background:#0B5C63;color:#fff;width:100%} .ds-btn:focus-visible{outline:3px solid #0B5C63;outline-offset:2px} .ds-btn:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Tonal Button",
+      "kind": "button",
+      "refersTo": "button-tonal",
+      "description": "Pause, Cancel and secondary choices.",
+      "html": "<button class=\"ds-btn ds-tonal\">Pause</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:0 24px;border-radius:28px;border:0;font:500 16px Roboto,sans-serif;background:#0B5C63;color:#fff;width:100%} .ds-btn:focus-visible{outline:3px solid #0B5C63;outline-offset:2px} .ds-btn:active{transform:scale(.98)} .ds-tonal{background:#CCE8E5;color:#05201E}"
+    },
+    {
+      "name": "Disabled Button",
+      "kind": "button",
+      "refersTo": "button-disabled",
+      "description": "Shown when the drive is out.",
+      "html": "<button class=\"ds-btn ds-off\" disabled>Plug in your drive</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:0 24px;border-radius:28px;border:0;font:500 16px Roboto,sans-serif;background:#0B5C63;color:#fff;width:100%} .ds-btn:focus-visible{outline:3px solid #0B5C63;outline-offset:2px} .ds-btn:active{transform:scale(.98)} .ds-off{background:#DDE7E6;color:#3F4948}"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": "chip-ok",
+      "description": "Drive state at the top of Home.",
+      "html": "<span class=\"ds-chip\">Drive connected</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:10px;background:#C4EBEA;color:#00201F;font:500 14px Roboto,sans-serif}"
+    },
+    {
+      "name": "Row Card",
+      "kind": "card",
+      "refersTo": "card-row",
+      "description": "Your photos / Backup history entries on Home.",
+      "html": "<div class=\"ds-row\"><div><div class=\"ds-t\">Your photos</div><div class=\"ds-s\">1,346 photos</div></div></div>",
+      "css": ".ds-row{display:flex;align-items:center;min-height:64px;padding:14px 16px;border-radius:20px;background:#EAF1F0;color:#161D1D;font-family:Roboto,sans-serif} .ds-t{font:500 16px Roboto,sans-serif} .ds-s{font-size:14px;color:#3F4948}"
+    },
+    {
+      "name": "Navigation Bar",
+      "kind": "nav",
+      "refersTo": "navigation-bar",
+      "description": "Home and Photos, always-visible labels.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-on\"><i></i>Home</span><span>Photos</span></nav>",
+      "css": ".ds-nav{display:flex;height:80px;padding-top:12px;background:#EAF1F0;font:500 12px Roboto,sans-serif;color:#3F4948} .ds-nav span{flex:1;text-align:center} .ds-on{color:#161D1D} .ds-on i{display:block;width:64px;height:32px;border-radius:16px;background:#C4EBEA;margin:0 auto 4px}"
+    },
+    {
+      "name": "Progress Bar",
+      "kind": "custom",
+      "refersTo": "progress",
+      "description": "Only visible during a copy or Load.",
+      "html": "<div class=\"ds-prog\"><i></i></div>",
+      "css": ".ds-prog{height:8px;border-radius:4px;background:#DDE7E6;overflow:hidden} .ds-prog i{display:block;width:60%;height:100%;background:#0B5C63;border-radius:4px}"
+    },
+    {
+      "name": "Ring Action",
+      "kind": "custom",
+      "refersTo": "viewer-action",
+      "description": "Share, Info, Load on the photo viewer.",
+      "html": "<div class=\"ds-act\"><div class=\"ds-ring\"></div>Load \u00b7 8.9 MB</div>",
+      "css": ".ds-act{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:72px;background:#1D2424;color:#fff;padding:12px;font:500 12px Roboto,sans-serif} .ds-ring{width:56px;height:56px;border-radius:28px;background:#7BD5DA}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Shelf",
+    "overview": "A shelf in a quiet room: everything has a place, you can see at a glance that it is all there, and nothing asks for attention until you reach for it. Native Material 3 in a single teal voice, with large pill buttons, soft tonal surfaces and plain words.",
+    "keyCharacteristics": [
+      "Native Material 3 structure, single teal brand hue",
+      "Tonal layering instead of shadows",
+      "Pill buttons 56 dp tall; every target at least 48 dp",
+      "Large type, 16 sp body minimum",
+      "Status never by colour alone",
+      "Dark theme is a full scheme; the photo viewer is always dark"
+    ],
+    "rules": [
+      {
+        "name": "The Calm Drive Rule",
+        "body": "A missing Archive Drive is amber or neutral, never red. Red means a file did not verify or a copy failed.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Voice Rule",
+        "body": "Teal is the only brand hue. Primary teal fills at most one button per screen.",
+        "section": "colors"
+      },
+      {
+        "name": "The Words Beside Colour Rule",
+        "body": "A state is never signalled by colour alone; every chip, badge and pill carries an icon and a plain-word label.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sentence First Rule",
+        "body": "Each screen opens with one complete plain sentence as its headline.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Chrome Rule",
+        "body": "App chrome has no shadows. Only the photo viewer uses gradients, and only to keep text legible.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do open every screen with one plain sentence, one count and one obvious button.",
+      "Do say where the Original is in plain words, beside an icon.",
+      "Do keep 48 dp minimum targets and 56 dp for the primary action.",
+      "Do theme through Material roles; never raw hex in a composable.",
+      "Do treat a missing drive as a calm, ordinary state.",
+      "Do let the photo viewer go fully dark.",
+      "Do honour Reduce Motion."
+    ],
+    "donts": [
+      "Don't use the stock Material purple baseline or a second brand hue.",
+      "Don't use red for a missing drive, or teal for an unverified state.",
+      "Don't show a full progress bar at rest, or repeat a count twice on one screen.",
+      "Don't use the words cloud, thumbnail, synced, or restore.",
+      "Don't put shadows on app chrome or nest cards.",
+      "Don't hide the where-is-it message inside a sheet.",
+      "Don't stretch the phone layout on wide windows."
+    ]
+  }
+}

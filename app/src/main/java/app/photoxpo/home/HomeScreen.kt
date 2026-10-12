@@ -3,7 +3,12 @@ package app.photoxpo.home
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -13,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +32,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -33,7 +43,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.photoxpo.backup.BackupStatus
 import app.photoxpo.backup.BackupUiState
+import app.photoxpo.R
 import app.photoxpo.data.DriveStatus
+import app.photoxpo.ui.components.ChipTone
+import app.photoxpo.ui.components.RowCard
+import app.photoxpo.ui.components.StatusChip
 import app.photoxpo.ui.theme.PhotoxpoTheme
 
 @Composable
@@ -42,6 +56,7 @@ fun HomeScreen(
     onPrimary: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenHistory: () -> Unit = {},
+    onOpenPhotos: () -> Unit = {},
     onChooseDrive: () -> Unit = {},
     onUseThisDriveInstead: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -50,64 +65,121 @@ fun HomeScreen(
     LaunchedEffect(model.showDriveMismatch) {
         if (!model.showDriveMismatch) hideMismatch = false
     }
+    val canStart = model.primaryPauses || model.driveConnected
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        model.accessWarning?.let { warning ->
-            AccessWarningBanner(
-                warning = warning,
-                onOpenSettings = onOpenSettings,
+    Column(modifier = modifier.fillMaxSize()) {
+        Text(
+            text = "Photoxpo",
+            modifier = Modifier
+                .defaultMinSize(minHeight = 64.dp)
+                .padding(horizontal = 20.dp)
+                .wrapContentHeight(Alignment.CenterVertically)
+                .semantics { heading() },
+            style = MaterialTheme.typography.titleLarge,
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .widthIn(max = 600.dp)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            model.accessWarning?.let { warning ->
+                AccessWarningBanner(
+                    warning = warning,
+                    onOpenSettings = onOpenSettings,
+                )
+            }
+            StatusChip(
+                label = model.driveChipLabel,
+                icon = painterResource(
+                    if (model.driveConnected) R.drawable.ic_check_circle else R.drawable.ic_schedule,
+                ),
+                tone = if (model.driveConnected) ChipTone.Ok else ChipTone.Warn,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = model.statusSentence,
+                    modifier = Modifier.semantics { heading() },
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                if (model.showProgress) {
+                    Text(
+                        text = model.progressText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Progress(model)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_schedule),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = model.lastBackedUpLine,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (model.primaryPauses) {
+                FilledTonalButton(
+                    onClick = onPrimary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp),
+                    shape = RoundedCornerShape(28.dp),
+                ) {
+                    PrimaryLabel(model.primaryLabel)
+                }
+            } else {
+                Button(
+                    onClick = onPrimary,
+                    enabled = canStart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                ) {
+                    PrimaryLabel(if (canStart) model.primaryLabel else "Plug in your drive")
+                }
+                if (!model.driveConnected) {
+                    TextButton(
+                        onClick = onChooseDrive,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .heightIn(min = 48.dp),
+                    ) {
+                        Text("Reconnect")
+                    }
+                }
+            }
+            RowCard(
+                title = "Your photos",
+                supporting = "Browse your Previews",
+                icon = painterResource(R.drawable.ic_folder_photos),
+                onClick = onOpenPhotos,
+            )
+            RowCard(
+                title = "Backup history",
+                supporting = "By month and by backup",
+                icon = painterResource(R.drawable.ic_history),
+                onClick = onOpenHistory,
             )
         }
-        model.offlineBanner?.let { banner ->
-            OfflineBanner(
-                banner = banner,
-                onReconnect = onChooseDrive,
-            )
-        }
-        Text(
-            text = model.statusSentence,
-            modifier = Modifier.semantics { heading() },
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Text(
-            text = model.progressText,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = model.lastBackedUpLine,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Progress(model)
-        if (model.primaryPauses) {
-            FilledTonalButton(
-                onClick = onPrimary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 64.dp),
-                shape = RoundedCornerShape(28.dp),
-            ) {
-                PrimaryLabel(model.primaryLabel)
-            }
-        } else {
-            Button(
-                onClick = onPrimary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 64.dp),
-                shape = RoundedCornerShape(28.dp),
-            ) {
-                PrimaryLabel(model.primaryLabel)
-            }
-        }
-        BackupHistoryRow(onClick = onOpenHistory)
     }
 
     if (model.showDriveMismatch && !hideMismatch) {
@@ -170,44 +242,27 @@ private fun AccessWarningBanner(
 }
 
 @Composable
-private fun OfflineBanner(
-    banner: HomeOfflineBanner,
-    onReconnect: () -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = banner.message,
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = banner.lastBackedUpLine,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            TextButton(onClick = onReconnect) {
-                Text("Reconnect")
-            }
-        }
-    }
-}
-
-@Composable
 private fun Progress(model: HomeUiModel) {
+    if (!model.showProgress) return
     val fraction = model.progressFraction
+    val modifier = Modifier
+        .fillMaxWidth()
+        .height(8.dp)
     if (fraction != null) {
         LinearProgressIndicator(
             progress = { fraction },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = modifier,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            strokeCap = StrokeCap.Round,
+            gapSize = 0.dp,
+            drawStopIndicator = {},
         )
     } else if (model.primaryPauses) {
-        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        LinearProgressIndicator(
+            modifier = modifier,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            strokeCap = StrokeCap.Round,
+        )
     }
 }
 
@@ -218,30 +273,6 @@ private fun PrimaryLabel(label: String) {
         style = MaterialTheme.typography.titleMedium,
         textAlign = TextAlign.Center,
     )
-}
-
-@Composable
-private fun BackupHistoryRow(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = 64.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Text(
-                text = "Backup history",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = "By month and by backup",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
 }
 
 @Preview(name = "Home", showBackground = true, widthDp = 360, heightDp = 800)

@@ -30,6 +30,7 @@ import app.photoxpo.home.HomeViewModel
 fun HomeRoute(
     modifier: Modifier = Modifier,
     onOpenHistory: () -> Unit = {},
+    onOpenPhotos: () -> Unit = {},
     onChooseDrive: (() -> Unit)? = null,
     onUseThisDriveInstead: (() -> Unit)? = null,
 ) {
@@ -73,6 +74,7 @@ fun HomeRoute(
             }
         },
         onOpenHistory = onOpenHistory,
+        onOpenPhotos = onOpenPhotos,
         onChooseDrive = onChooseDrive ?: pickDrive,
         onUseThisDriveInstead = onUseThisDriveInstead ?: controller::useThisDriveInstead,
         onOpenSettings = {
