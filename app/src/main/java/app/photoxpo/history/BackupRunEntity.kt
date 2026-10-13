@@ -17,4 +17,6 @@ data class BackupRunEntity(
     val elapsedMs: Long?,
     val mbPerSecond: Double?,
     val interrupted: Boolean,
+    /** [app.photoxpo.core.RunEnd.wire]; null for runs cached before the reason existed. */
+    val runEnd: String? = null,
 )

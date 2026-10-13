@@ -4,6 +4,7 @@ import app.photoxpo.backup.LastArchiveDriveConnection
 import app.photoxpo.core.ArchiveDrive
 import app.photoxpo.core.BackupHistoryReader
 import app.photoxpo.core.BackupRunSummary
+import app.photoxpo.core.RunEnd
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -58,6 +59,7 @@ private fun BackupRunSummary.toEntity(): BackupRunEntity {
         elapsedMs = elapsedMs,
         mbPerSecond = mbPerSecond,
         interrupted = interrupted,
+        runEnd = runEnd?.wire,
     )
 }
 
@@ -72,5 +74,6 @@ private fun BackupRunEntity.toSummary(): BackupRunSummary {
         elapsedMs = elapsedMs,
         mbPerSecond = mbPerSecond,
         interrupted = interrupted,
+        runEnd = RunEnd.fromWire(runEnd),
     )
 }

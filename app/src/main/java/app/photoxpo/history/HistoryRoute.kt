@@ -408,6 +408,13 @@ private fun BackupRow(row: HistoryBackupRow) {
                         color = colors.onTertiaryContainer,
                     )
                 }
+                row.endReasonLabel?.let { reason ->
+                    Text(
+                        text = reason,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
                 if (row.checked) {
                     Text(
                         text = "Backed up and checked",

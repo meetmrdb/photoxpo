@@ -159,7 +159,7 @@ class BackupRunner(
             val endedAt = clock.instant()
             archiveDrive.appendText(
                 manifestPath,
-                footerLine(startedAt, endedAt, committedCount, committedBytes) + "\n",
+                footerLine(startedAt, endedAt, committedCount, committedBytes, stopReason) + "\n",
             )
             return BackupRunResult(
                 manifestPath = manifestPath,
@@ -338,6 +338,7 @@ private fun footerLine(
     endedAt: Instant,
     fileCount: Int,
     bytes: Long,
+    stopReason: StopReason?,
 ): String {
     val elapsedMs = Duration.between(startedAt, endedAt).toMillis().coerceAtLeast(0)
     val mbPerSecond = if (elapsedMs == 0L) {
@@ -354,6 +355,7 @@ private fun footerLine(
         .field("checked", true)
         .field("elapsedMs", elapsedMs)
         .field("mbPerSecond", mbPerSecond)
+        .field("stopReason", (stopReason?.let { RunEnd.Stopped(it) } ?: RunEnd.Finished).wire)
         .build()
 }
 
