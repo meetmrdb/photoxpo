@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -59,6 +60,8 @@ import app.photoxpo.R
 import app.photoxpo.backup.BackupSettingsStore
 import app.photoxpo.core.ArchiveDrive
 import app.photoxpo.core.BackupRunSummary
+import app.photoxpo.core.VerifyEverything
+import app.photoxpo.data.MediaStoreSource
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.data.SafArchiveDrive
 import app.photoxpo.data.probeArchiveDrive
@@ -96,6 +99,8 @@ fun HistoryRoute(
     var loaded by remember { mutableStateOf(false) }
     var strips by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
     val previewCache = remember { PreviewBitmapCache() }
+    var verifying by remember { mutableStateOf(false) }
+    var verifyMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -157,8 +162,45 @@ fun HistoryRoute(
         modifier = modifier,
         strips = strips,
         previewCache = previewCache,
+        verify = VerifyEverythingUi(
+            enabled = driveAttached && !verifying,
+            running = verifying,
+            message = verifyMessage,
+            onVerify = {
+                verifying = true
+                verifyMessage = null
+                scope.launch {
+                    verifyMessage = try {
+                        withContext(Dispatchers.IO) {
+                            val drive = openAttachedArchiveDrive(appContext)
+                                ?: return@withContext "Connect your drive to verify everything"
+                            val report = VerifyEverything(
+                                MediaStoreSource(appContext),
+                                drive,
+                                BackupSettingsStore(appContext),
+                            ).run()
+                            verifyEverythingMessage(report)
+                        }
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Exception) {
+                        "Could not verify. Check your drive and try again"
+                    } finally {
+                        verifying = false
+                    }
+                }
+            },
+        ),
     )
 }
+
+/** State for the "Verify everything" action in Backup history. */
+data class VerifyEverythingUi(
+    val enabled: Boolean,
+    val running: Boolean,
+    val message: String?,
+    val onVerify: () -> Unit,
+)
 
 /** Up to four Preview hashes per month label, newest first, for the month thumbnail strips. */
 private suspend fun monthStrips(
@@ -189,6 +231,7 @@ fun HistoryScreen(
     modifier: Modifier = Modifier,
     strips: Map<String, List<String>> = emptyMap(),
     previewCache: PreviewBitmapCache? = null,
+    verify: VerifyEverythingUi? = null,
 ) {
     Scaffold(
         modifier = modifier,
@@ -217,6 +260,7 @@ fun HistoryScreen(
             ) {
                 model.asOfLabel?.let { label -> AsOfNote(label) }
                 GroupingToggle(grouping = model.grouping, onGrouping = onGrouping)
+                verify?.let { VerifyEverythingRow(it) }
             }
             LazyColumn(
                 modifier = Modifier
@@ -280,6 +324,22 @@ private fun GroupingToggle(
             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
         ) {
             Text("By backup", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+private fun VerifyEverythingRow(verify: VerifyEverythingUi) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = verify.onVerify, enabled = verify.enabled) {
+            Text(if (verify.running) "Verifying..." else "Verify everything")
+        }
+        verify.message?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
