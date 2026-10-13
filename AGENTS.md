@@ -22,3 +22,5 @@ Claude orchestrates and follows the user-level `delegate-router` skill (`~/.clau
 - Write delegated task text in the `GLOSSARY.md` terms (Archive Drive, Original, Preview, Backed up) and avoid the terms it lists under _Avoid_.
 - Delegate only from a clean git tree on a feature branch, never inside `.claude/worktrees/`.
 - Verify command: `./gradlew testDebugUnitTest` (JVM unit tests, run from the repo root). Needs `ANDROID_HOME` or `local.properties` with `sdk.dir` (the file is gitignored).
+- Testing on a phone or the emulator: `DEVICE-NOTES.md` ("Driving the app from adb") has serials, state locations and how to fake battery and large backlogs.
+- Stage by explicit path (`git add <path>`), never `git add -A`: unrelated edits have been swept into commits before.

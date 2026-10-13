@@ -3,6 +3,19 @@
 Observed facts from testing Build 1 (issue #22). Observed, not gates, except where a stop-ship item is marked.
 Each entry: date, stage, device, what was done, result.
 
+## Driving the app from adb
+
+How to set up and read a test, so it is not rediscovered. The phone is `10.0.0.10:5555` over wifi (the address can change; check `adb devices`), the emulator is `emulator-5554`. The package is `app.photoxpo`; `adb install -r` keeps data.
+
+- **Read Home as text:** `scripts/home-state.sh [serial]` prints the screen's text. Use a screenshot only for how something looks. Screenshot coordinates are scaled; multiply by the factor the image reports.
+- **Archive Drive on the emulator:** `/sdcard/FakeArchiveDrive`. Run files are in `Photoxpo/.photoxpo/runs/`, Originals in `Photoxpo/Originals/<year>/<year>-<month>/`.
+- **Fake the battery:** `adb shell dumpsys battery unplug`, then `set level 12`; undo with `reset`. Home reads the sticky broadcast, so relaunch or pull down to refresh.
+- **Fake a big backlog:** `truncate -s 6000000000 /sdcard/DCIM/Camera/NAME.mp4`, then `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera/NAME.mp4`. MediaStore reports the full size; the file takes no space until a run reads it. Remove it afterwards.
+- **A copied duplicate** of an existing photo counts as backed up with `fileCount 0` in the footer, because the copier stores one copy per hash.
+- **Where state lives** (`adb shell run-as app.photoxpo`): `shared_prefs/photoxpo.backed-up.xml` is the ledger of Originals; `photoxpo.checked-at.xml` holds `hash|size|modified|checkedAtMillis`; Room `databases/photos.db` table `backup_runs` caches Backup history.
+- **Room caches run history.** Moving run files off the drive does not change Home's time and battery estimate. Clear it with `sqlite3 databases/photos.db "delete from backup_runs"` after copying `photos.db*` somewhere to restore from.
+- **Time estimate needs no history to warn.** With real runs on record the copy speed is the measured one (12 MB/s on the emulator), so a long-run warning shows only with no usable history (fallback 3 MB/s).
+
 ## 2026-10-12 — Stage 1 (emulator)
 
 **Device:** Android emulator `HomeVault_API35` (Android 15, API 35, x86_64). A folder on emulated storage (`/sdcard/FakeArchiveDrive`), chosen through the real system folder picker, stood in for the Archive Drive. The emulator's `DCIM/Camera` held 8 photos and 3 videos (2 of the videos are byte-identical).
