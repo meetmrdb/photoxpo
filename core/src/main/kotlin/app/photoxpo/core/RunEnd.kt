@@ -30,6 +30,8 @@ sealed interface RunEnd {
 private fun StopReason.wire(): String = when (this) {
     StopReason.SizeLimit -> "size-limit"
     StopReason.TimeLimit -> "time-limit"
+    StopReason.LowBattery -> "low-battery"
+    StopReason.DriveFull -> "drive-full"
 }
 
 /** The plain-words line Backup history shows for a run. */
@@ -38,5 +40,7 @@ fun runEndWords(end: RunEnd): String = when (end) {
     is RunEnd.Stopped -> when (end.reason) {
         StopReason.SizeLimit -> "Stopped at the size limit"
         StopReason.TimeLimit -> "Stopped at the time limit"
+        StopReason.LowBattery -> "Paused at 15% battery"
+        StopReason.DriveFull -> "Your Archive Drive is full"
     }
 }

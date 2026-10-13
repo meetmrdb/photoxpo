@@ -31,3 +31,15 @@ _Avoid_: Sync, job, session
 **Manifest**:
 The Archive Drive's own record of which Originals are Backed up, kept as one file per Backup run, so a new phone can rebuild from the drive alone.
 _Avoid_: Index, catalog, database
+
+**Free up space**:
+Removing an Original from the phone after it is Backed up, leaving its Preview behind.
+_Avoid_: Clean up, delete, offload
+
+**Plus**:
+The one-time purchase that unlocks the extras beyond what every person gets for free. Backing up, the Backed up check, Load and browsing Previews are never part of it.
+_Avoid_: Pro, Premium, Subscription
+
+**Free allowance**:
+The amount of space a person can Free up without Plus, enough to see the whole journey work.
+_Avoid_: Trial, quota, limit
