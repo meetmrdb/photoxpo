@@ -2,6 +2,7 @@ package app.photoxpo.home
 
 import app.photoxpo.backup.BackupStatus
 import app.photoxpo.backup.BackupUiState
+import app.photoxpo.core.RunStage
 
 private const val MINUTE_MS = 60_000L
 
@@ -16,6 +17,9 @@ internal fun runPaceLine(state: BackupUiState, nowEpochMillis: Long): String? {
 }
 
 private fun runLeftPhrase(state: BackupUiState, now: Long, elapsed: Long): String {
+    if (state.runStage == RunStage.Checking) {
+        return if (state.runBytesToCopy > 0L) "everything new is already safe" else "nothing new to copy"
+    }
     val firstAt = state.firstCopyAtMillis
     if (firstAt == null) return "checking photos already on your drive"
     val remaining = (state.runBytesToCopy - state.runBytesCopied).coerceAtLeast(0L)

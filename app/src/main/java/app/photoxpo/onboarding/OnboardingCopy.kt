@@ -126,7 +126,7 @@ fun readyLines(summary: ReadySummary): ReadyLines {
         "Archive Drive not chosen yet"
     }
     val note = if (summary.firstBackupTakesHoursAndCanBePaused) {
-        "The first backup takes hours and can be paused."
+        "The first backup takes hours and can be paused. You can unplug your drive any time; backup carries on when you plug it back in."
     } else {
         null
     }

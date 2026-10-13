@@ -5,6 +5,7 @@ import app.photoxpo.backup.BackupUiState
 import app.photoxpo.backup.PauseReason
 import app.photoxpo.backup.SessionAccess
 import app.photoxpo.backup.sessionAccessBlock
+import app.photoxpo.core.RunStage
 import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.onboarding.MediaAccessState
@@ -379,6 +380,62 @@ class HomeUiModelTest {
         assertEquals("Last backed up 3 hours ago", line(last + 3 * HOUR_MS))
         assertEquals("Last backed up yesterday", line(last + DAY_MS))
         assertEquals("Last backed up 4 days ago", line(last + 4 * DAY_MS))
+    }
+
+    @Test
+    fun idle_saysHowManyNewPhotosAndVideosAreWaiting() {
+        val state = base(backedUpCount = 509).copy(filesToCopy = 12, videosToCopy = 1, bytesToCopy = 1_400_000_000L)
+        assertEquals("12 new photos and videos · 1.4 GB to back up", homeUiModel(state, NOW).newLine)
+    }
+
+    @Test
+    fun newLine_namesOnlyPhotos_orOnlyVideos_andHandlesOne() {
+        val photos = base().copy(filesToCopy = 3, videosToCopy = 0, bytesToCopy = 9_000_000L)
+        assertEquals("3 new photos · 9 MB to back up", homeUiModel(photos, NOW).newLine)
+        val video = base().copy(filesToCopy = 1, videosToCopy = 1, bytesToCopy = 86_000_000L)
+        assertEquals("1 new video · 86 MB to back up", homeUiModel(video, NOW).newLine)
+    }
+
+    @Test
+    fun newLine_isAbsentWhenNothingIsWaiting_orWhileRunning_orWithoutTheDrive() {
+        assertNull(homeUiModel(base().copy(filesToCopy = 0), NOW).newLine)
+        assertNull(homeUiModel(base().copy(filesToCopy = null), NOW).newLine)
+        assertNull(homeUiModel(base(status = BackupStatus.Running).copy(filesToCopy = 5), NOW).newLine)
+        assertNull(homeUiModel(base(driveStatus = DriveStatus.Absent).copy(filesToCopy = 5), NOW).newLine)
+    }
+
+    @Test
+    fun running_tellsThePersonTheyCanUnplugTheDrive() {
+        val running = homeUiModel(base(status = BackupStatus.Running), NOW)
+        assertEquals(UNPLUG_REASSURANCE, running.unplugReassurance)
+        assertNull(homeUiModel(base(), NOW).unplugReassurance)
+    }
+
+    @Test
+    fun unpluggedDrive_saysNothingIsLost() {
+        assertTrue(app.photoxpo.backup.MESSAGE_DRIVE_OUT.contains("Nothing is lost"))
+    }
+
+    @Test
+    fun running_saysWhetherItIsBackingUpOrChecking_andHowFarTheCheckIs() {
+        val copying = base(status = BackupStatus.Running, backedUpCount = 492, totalCount = 497)
+            .copy(runStage = RunStage.Copying, stageDone = 1, stageTotal = 5)
+        val copyingModel = homeUiModel(copying, NOW)
+        assertEquals("Backing up your photos", copyingModel.statusSentence)
+        assertEquals("Backed up 492 of 497", copyingModel.progressText)
+
+        val checking = copying.copy(runStage = RunStage.Checking, stageDone = 320, stageTotal = 509)
+        val checkingModel = homeUiModel(checking, NOW)
+        assertEquals("Checking your backed up photos", checkingModel.statusSentence)
+        assertEquals("Checked 320 of 509 already on your drive", checkingModel.progressText)
+        assertEquals(320f / 509f, checkingModel.progressFraction!!, 0.001f)
+    }
+
+    @Test
+    fun checkingStageIsIgnoredOnceTheRunIsNotRunning() {
+        val paused = base(status = BackupStatus.Paused(PauseReason.User), backedUpCount = 5)
+            .copy(runStage = RunStage.Checking, stageDone = 3, stageTotal = 9)
+        assertEquals("Backed up 5", homeUiModel(paused, NOW).progressText)
     }
 
     private fun base(
