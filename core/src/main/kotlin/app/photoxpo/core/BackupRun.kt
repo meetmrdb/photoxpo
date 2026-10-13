@@ -63,6 +63,7 @@ class BackupRunner(
     private val fileCap: Int? = null,
     private val previewPreset: PreviewPreset? = null,
     private val isCancelled: () -> Boolean = { false },
+    private val checkPolicy: CheckPolicy = CheckPolicy.skipRecentlyChecked(),
 ) {
     fun start(): BackupRunResult {
         val startedAt = clock.instant()
@@ -120,6 +121,10 @@ class BackupRunner(
                         manifestHasNoFileLine = linesByHash.isEmpty(),
                     )
                 }
+                if (checkedRecentlyAndStillOnDrive(file, committed)) {
+                    items += BackupItemOutcome(file.id, file.name, ItemState.COMMITTED)
+                    continue
+                }
                 val allowNewCopy = fileCap == null || copies < fileCap
                 val copied = copier.copy(file, allowNewCopy)
                 if (copied.deferredByCap) {
@@ -127,7 +132,7 @@ class BackupRunner(
                     continue
                 }
                 if (copied.hash != null && copied.outcome.state == ItemState.COMMITTED) {
-                    backedUpLedger.record(file.id, copied.hash)
+                    backedUpLedger.recordChecked(file, copied.hash, clock.instant())
                 }
                 if (copied.wroteNewFileLine) {
                     committedCount += 1
@@ -147,6 +152,14 @@ class BackupRunner(
         } catch (_: DriveUnavailableException) {
             return pausedResult(manifestPath, files, items, deferred)
         }
+    }
+
+    private fun checkedRecentlyAndStillOnDrive(file: MediaFile, committed: List<ManifestFileEntry>): Boolean {
+        val record = backedUpLedger.checkedOriginal(file.id)
+        if (!checkPolicy.isRecentlyChecked(record, file, clock.instant())) return false
+        // The Archive Drive is the record: the Manifest must still list it and the file must still be there.
+        val entry = committed.firstOrNull { it.hash == record?.hash } ?: return false
+        return archiveDrive.exists(entry.drivePath) && archiveDrive.byteCount(entry.drivePath) == file.sizeBytes
     }
 
     private fun cancelBetweenFiles(
