@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photoxpo PROTOTYPE – History and onboarding, now vs proposed</title>
+<!--
+  PROTOTYPE, THROWAWAY. Question: can Backup history and onboarding get the same treatment as Home and Photos
+  (fewer lines, one voice, the serif where text is big), and what is the shortest honest path to a first backup?
+  Left phone = what the app does today (copied from HistoryRoute.kt, HistoryUiModel.kt, OnboardingScreen.kt and
+  strings.xml). Right phone = proposal. All photos are drawn placeholders. Nothing here is product code.
+  Research: Refero (komoot and Halide permission screens, Dropbox camera-uploads flow, Brilliant / Joi progress and skip).
+  Open from the repo root through a local server so the font and logo paths resolve.
+-->
+<style>
+@font-face{font-family:"Instrument Serif";src:url("../../assets/fonts/instrument-serif/InstrumentSerif-Regular.ttf") format("truetype");font-display:swap}
+:root{
+  --p:#0B5C63;--on-p:#fff;--pc:#C4EBEA;--on-pc:#00201F;
+  --sc:#CCE8E5;--on-sc:#05201E;
+  --bg:#F6FAF9;--surf:#EAF1F0;--surf-hi:#DDE7E6;--on:#161D1D;--var:#3F4948;
+  --outline:#6F7978;--outv:#BEC9C8;
+  --warn:#FFDEA1;--on-warn:#3E2D00;
+  --err:#B3261E;--errc:#F9DEDC;--on-errc:#410E0B;
+  --scrim:rgba(10,16,16,.62);
+  --fs:1;
+  --serif:"Instrument Serif",Georgia,serif;
+  --sans:Roboto,"Segoe UI",system-ui,sans-serif;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+body[data-theme=dark]{
+  --p:#7BD5DA;--on-p:#003739;--pc:#004F53;--on-pc:#C4EBEA;
+  --sc:#2F4B49;--on-sc:#CCE8E5;
+  --bg:#0E1514;--surf:#192020;--surf-hi:#252D2D;--on:#DDE4E3;--var:#BEC9C8;
+  --outline:#889392;--outv:#3F4948;
+  --warn:#5A4300;--on-warn:#FFDEA1;
+  --err:#FFB4AB;--errc:#93000A;--on-errc:#FFDAD6;
+}
+*{box-sizing:border-box;margin:0}
+body{font:14px/1.4 var(--sans);background:#d5dddc;color:#162020;padding:20px 16px 48px}
+body[data-theme=dark]{background:#0a0f0f;color:#dde4e3}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit}
+:focus-visible{outline:3px solid var(--p);outline-offset:2px}
+
+/* ---------- prototype controls (not part of the app) ---------- */
+#bar{max-width:1000px;margin:0 auto 18px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+#bar h1{font:400 28px/1.1 var(--serif);width:100%}
+.grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.lab{font-size:12px;opacity:.7;margin-right:2px}
+.chipb{padding:7px 12px;border-radius:999px;border:1px solid #8a9a99;min-height:36px;font-size:13px}
+.chipb[aria-pressed=true]{background:#0B5C63;color:#fff;border-color:#0B5C63}
+body[data-theme=dark] .chipb[aria-pressed=true]{background:#7BD5DA;color:#003739;border-color:#7BD5DA}
+#stage{max-width:1000px;margin:0 auto;display:flex;flex-wrap:wrap;gap:28px;justify-content:center;align-items:flex-start}
+.col{display:flex;flex-direction:column;align-items:center;gap:8px}
+.cap{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;opacity:.75}
+.cap.new{color:#0B5C63;opacity:1}
+body[data-theme=dark] .cap.new{color:#7BD5DA}
+#notes{max-width:1000px;margin:26px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+#notes section{background:#ffffff70;border-radius:16px;padding:16px}
+body[data-theme=dark] #notes section{background:#ffffff10}
+#notes h2{font:400 22px/1.15 var(--serif);margin-bottom:8px}
+#notes li{margin:0 0 6px 18px}
+#notes p{margin-bottom:8px}
+
+/* ---------- phone ---------- */
+.phone{width:372px;height:780px;border-radius:40px;background:#000;padding:9px;box-shadow:0 14px 34px #0004;position:relative}
+.screen{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;background:var(--bg);color:var(--on);display:flex;flex-direction:column}
+.sb{height:30px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-size:12px;font-weight:500}
+.body{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;display:flex;flex-direction:column}
+.body::-webkit-scrollbar{display:none}
+svg.i{width:24px;height:24px;fill:currentColor;flex:none}
+
+/* ---------- type steps (sp, scaled) ---------- */
+.t-head{font:400 calc(34px*var(--fs))/1.12 var(--serif);text-wrap:balance}
+.t-title2{font:400 calc(26px*var(--fs))/1.15 var(--serif)}
+.t-month{font:400 calc(22px*var(--fs))/1.2 var(--serif)}
+.t-large{font:500 calc(22px*var(--fs))/1.25 var(--sans)}
+.t-title{font:500 calc(16px*var(--fs))/1.4 var(--sans);letter-spacing:.1px}
+.t-body{font:400 calc(16px*var(--fs))/1.45 var(--sans)}
+.t-bodym{font:400 calc(14px*var(--fs))/1.4 var(--sans)}
+.t-bodymm{font:500 calc(14px*var(--fs))/1.4 var(--sans)}
+.t-label{font:500 calc(12px*var(--fs))/1.3 var(--sans)}
+.fig{font-family:var(--sans)}
+.var{color:var(--var)}.pri{color:var(--p)}
+
+/* ---------- shared pieces ---------- */
+.logo{height:40px;display:block}
+.btn{width:100%;min-height:56px;border-radius:28px;background:var(--p);color:var(--on-p);font:500 calc(16px*var(--fs)) var(--sans);display:grid;place-items:center;padding:0 24px;text-align:center}
+.btn.tonal{background:var(--sc);color:var(--on-sc)}
+.btn.off{background:var(--surf-hi);color:var(--var)}
+.btn.outline{background:none;border:1px solid var(--outline);color:var(--p);min-height:48px}
+.txtbtn{min-height:48px;color:var(--p);font:500 calc(16px*var(--fs)) var(--sans);padding:0 16px;display:grid;place-items:center}
+.card{background:var(--surf);border-radius:20px;padding:16px}
+.note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px}
+.note svg{width:22px;height:22px;margin-top:1px}
+.note.ok{background:var(--pc);color:var(--on-pc)}
+.note.err{background:var(--errc);color:var(--on-errc)}
+.note.warn{background:var(--warn);color:var(--on-warn)}
+.seg{display:flex;border:1px solid var(--outline);border-radius:20px;overflow:hidden}
+.seg button{padding:0 14px;display:grid;place-items:center;font:500 calc(14px*var(--fs)) var(--sans);min-height:40px;white-space:nowrap}
+.seg .sel{background:var(--sc);color:var(--on-sc)}
+.seg.compact button{min-height:36px}
+.tile{border-radius:2px;background:linear-gradient(135deg,hsl(var(--a) 38% 38%),hsl(var(--b) 44% 58%))}
+
+/* ---------- HISTORY: now ---------- */
+.topbar{min-height:64px;display:flex;align-items:center;gap:8px;padding:0 4px 0 4px;flex:none}
+.topbar .ib{width:48px;height:48px;display:grid;place-items:center;border-radius:50%}
+.h-now{padding:8px 16px 24px;display:flex;flex-direction:column;gap:16px}
+.h-now .seg button{flex:1;min-height:48px}
+.h-now .seg .sel::before{content:"✓ "}
+.verify{align-self:flex-start;min-height:48px;padding:0 24px;border:1px solid var(--outline);border-radius:24px;color:var(--p);font:500 calc(16px*var(--fs)) var(--sans);display:grid;place-items:center}
+.monthrow{display:flex;gap:14px;align-items:center}
+.strip4{width:112px;height:56px;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;border-radius:10px;overflow:hidden;flex:none}
+.runcard{display:flex;gap:14px;background:var(--surf);border-radius:20px;padding:16px}
+.runcard .dot{width:44px;height:44px;border-radius:50%;background:var(--pc);color:var(--on-pc);display:grid;place-items:center;flex:none}
+.runcard .dot.w{background:var(--warn);color:var(--on-warn)}
+.runcard .tx{display:flex;flex-direction:column;gap:2px}
+
+/* ---------- HISTORY: proposed ---------- */
+.h-new{padding:0 16px 24px;display:flex;flex-direction:column;gap:14px}
+.hstrip{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:0 4px 0 4px;flex-wrap:wrap}
+.hstrip .s{display:flex;gap:8px;align-items:center;min-width:0}
+.hstrip .s svg{width:20px;height:20px}
+.month{background:var(--surf);border-radius:20px;overflow:hidden}
+.mhead{display:flex;gap:12px;align-items:center;padding:12px 16px}
+.mhead .strip4{width:84px;height:48px}
+.mhead .tx{flex:1;display:flex;flex-direction:column}
+.run{display:flex;gap:12px;align-items:center;padding:12px 16px;min-height:64px;border-top:1px solid var(--outv);width:100%}
+.run .tx{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0}
+.run .st{display:flex;gap:6px;align-items:center;white-space:nowrap}
+.run .st svg{width:18px;height:18px}
+.run .st.ok{color:var(--p)}
+.run .st.w{color:var(--on-warn);background:var(--warn);padding:4px 10px;border-radius:10px}
+.runwrap{border-top:1px solid var(--outv)}
+.runwrap .run{border-top:0}
+.runwrap .more{display:none;padding:0 16px 12px 16px;color:var(--var)}
+.runwrap.open .more{display:block}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:32px}
+
+/* ---------- ONBOARDING: now ---------- */
+.o-now{padding:12px 20px 24px;display:flex;flex-direction:column;gap:16px}
+.o-now .backb{display:flex;align-items:center;gap:6px;min-height:48px;align-self:flex-start;color:var(--p);font:500 calc(16px*var(--fs)) var(--sans)}
+.qcard{background:var(--surf);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:8px;border:2px solid transparent}
+.qcard.sel{border-color:var(--p)}
+.qcard .row{display:flex;gap:4px 8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.badge2{background:var(--pc);color:var(--on-pc);border-radius:10px;padding:2px 8px}
+.qimg{height:96px;border-radius:12px}
+
+/* ---------- ONBOARDING: proposed ---------- */
+.o-new{flex:1;display:flex;flex-direction:column;padding:0 20px 20px;gap:0}
+.prog{display:flex;gap:6px;align-items:center;padding:6px 0 0;flex:1}
+.prog i{flex:1;height:4px;border-radius:2px;background:var(--surf-hi)}
+.prog i.on{background:var(--p)}
+.otop{display:flex;align-items:center;gap:8px;min-height:56px;margin:0 -8px 0 -8px}
+.otop .ib{width:48px;height:48px;display:grid;place-items:center;border-radius:50%;flex:none}
+.otop .ib.ph{visibility:hidden}
+.otop .prog{padding:0 8px 0 0}
+.ocontent{flex:1;display:flex;flex-direction:column;gap:18px;padding-top:12px}
+.oactions{display:flex;flex-direction:column;gap:4px;padding-top:12px}
+.stepno{width:32px;height:32px;border-radius:50%;background:var(--pc);color:var(--on-pc);display:grid;place-items:center;font:500 calc(14px*var(--fs)) var(--sans);flex:none}
+.srow{display:flex;gap:14px;align-items:flex-start}
+.sysmock{border-radius:20px;background:var(--surf-hi);padding:8px;display:flex;flex-direction:column;gap:6px}
+.sysmock .opt{padding:12px 14px;border-radius:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--var)}
+.sysmock .opt.hl{background:var(--pc);color:var(--on-pc);outline:2px solid var(--p)}
+.sysmock .opt svg{width:20px;height:20px}
+.diagram{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 0}
+.diagram .node{display:flex;flex-direction:column;align-items:center;gap:8px;width:140px;text-align:center}
+.diagram .box{width:100%;height:128px;border-radius:20px;background:var(--surf);display:grid;place-items:center;position:relative;overflow:hidden}
+.diagram .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;width:78px}
+.diagram .grid3 .tile{aspect-ratio:1}
+.diagram .arrow{color:var(--p);flex:none}
+.sumrow{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px 0;min-height:64px}
+.sumrow+.sumrow{border-top:1px solid var(--outv)}
+.sumrow .l{display:flex;gap:12px;align-items:center}
+.sheetscrim{position:absolute;inset:0;background:var(--scrim);display:flex;align-items:flex-end;z-index:5}
+.sheet{width:100%;max-height:92%;overflow:auto;background:var(--bg);border-radius:28px 28px 0 0;padding:24px 20px 20px;display:flex;flex-direction:column;gap:14px;scrollbar-width:none}
+.opt3{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:16px;background:var(--surf);border:2px solid transparent}
+.opt3.sel{border-color:var(--p)}
+.opt3 .qimg{width:72px;height:72px;flex:none;border-radius:10px}
+.opt3 .tx{flex:1;display:flex;flex-direction:column;gap:1px}
+.radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--outline);flex:none;display:grid;place-items:center}
+.opt3.sel .radio{border-color:var(--p)}
+.opt3.sel .radio::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--p)}
+@media (prefers-reduced-motion:no-preference){.ocontent,.h-new{animation:rise .45s var(--ease) both}.sheet{animation:up .4s var(--ease) both}}
+@keyframes rise{from{opacity:.001;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes up{from{transform:translateY(40px);opacity:.001}to{transform:none;opacity:1}}
+</style>
+</head>
+<body data-theme="light">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></symbol>
+  <symbol id="i-tick" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></symbol>
+  <symbol id="i-drive" viewBox="0 0 24 24"><path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm2 5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm4.5.25h8v1.5h-8z"/></symbol>
+  <symbol id="i-photos" viewBox="0 0 24 24"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm0 18H7V5h10z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="m12 4-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5zm-2 16-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9z"/></symbol>
+</svg>
+
+<div id="bar">
+  <h1>History and onboarding: now, and proposed</h1>
+  <div class="grp" id="screens"><span class="lab">Screen</span></div>
+  <div class="grp" id="hstates"><span class="lab">History</span></div>
+  <div class="grp" id="osteps"><span class="lab">Onboarding step</span></div>
+  <div class="grp" id="ostates"></div>
+  <div class="grp"><span class="lab">View</span>
+    <button class="chipb" id="theme" aria-pressed="false">Dark</button>
+    <button class="chipb" id="large" aria-pressed="false">Large text 130%</button>
+  </div>
+</div>
+<div id="stage"></div>
+<div id="notes"></div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const ic = (id, cls = "", style = "") => `<svg class="i ${cls}" style="${style}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const dark = () => document.body.dataset.theme === "dark";
+const logo = (h = 40) => `<img class="logo" style="height:${h}px" alt="Photoxpo" src="../../assets/logo/logo-${dark() ? "light" : "dark"}-full.svg">`;
+const FIG = (s) => s.replace(/[0-9][0-9,.]*[0-9]|[0-9]/g, (m) => `<span class="fig">${m}</span>`);
+const tilesHue = (n, seed) => Array.from({ length: n }, (_, k) => `<div class="tile" style="--a:${(seed * 41 + k * 23) % 360};--b:${(seed * 41 + k * 23 + 50) % 360}"></div>`).join("");
+
+/* ================= HISTORY data (strings are the app's own) ================= */
+const END = {
+  fin: "Finished: everything new was backed up",
+  size: "Stopped at the size limit",
+  time: "Stopped at the time limit",
+  bat: "Paused at 15% battery",
+  full: "Your Archive Drive is full",
+  early: "Stopped early",
+};
+const MONTHS = {
+  normal: [
+    { m: "October 2026", t: "164 files, 1.7 GB", seed: 3, runs: [
+      { d: "13 Oct 2026, 2:05 pm", f: "1 file", s: "383.4 MB", ck: true, end: END.fin, sp: "18.89 MB/s" },
+      { d: "13 Oct 2026, 2:04 pm", f: "2 files", s: "763.9 MB", ck: true, end: END.size, sp: "15.28 MB/s" },
+      { d: "13 Oct 2026, 10:38 am", f: "1 file", s: "8.9 MB", ck: true, end: END.fin, sp: "0 MB/s" },
+    ] },
+    { m: "September 2026", t: "300 files, 4.3 GB", seed: 6, runs: [
+      { d: "28 Sep 2026, 8:00 pm", f: "212 files", s: "3.1 GB", ck: true, end: END.time, sp: "2.84 MB/s" },
+      { d: "2 Sep 2026, 7:15 pm", f: "88 files", s: "1.2 GB", ck: true, end: END.fin, sp: "3.02 MB/s" },
+    ] },
+  ],
+  mixed: [
+    { m: "October 2026", t: "164 files, 1.7 GB", seed: 3, runs: [
+      { d: "13 Oct 2026, 2:05 pm", f: "1 file", s: "383.4 MB", ck: true, end: END.fin, sp: "18.89 MB/s" },
+      { d: "13 Oct 2026, 2:04 pm", f: "2 files", s: "763.9 MB", ck: false, early: true, end: END.early, sp: null },
+      { d: "12 Oct 2026, 9:10 pm", f: "161 files", s: "560 MB", ck: true, end: END.bat, sp: "3.1 MB/s" },
+    ] },
+    { m: "September 2026", t: "300 files, 4.3 GB", seed: 6, runs: [
+      { d: "28 Sep 2026, 8:00 pm", f: "212 files", s: "3.1 GB", ck: true, end: END.time, sp: "2.84 MB/s" },
+      { d: "2 Sep 2026, 7:15 pm", f: "88 files", s: "1.2 GB", ck: true, end: END.full, sp: "3.02 MB/s" },
+    ] },
+  ],
+};
+let hs = { state: "normal", view: "month", open: new Set() };
+const months = () => (hs.state === "empty" ? [] : MONTHS[hs.state === "driveOut" ? "normal" : hs.state]);
+const allRuns = () => months().flatMap((m) => m.runs);
+const driveOut = () => hs.state === "driveOut";
+
+/* ---- NOW ---- */
+function historyNow() {
+  const seg = `<div class="seg">${[["month", "By month"], ["backup", "By backup"]].map(([k, t]) => `<button class="${hs.view === k ? "sel" : ""}" data-hview="${k}">${t}</button>`).join("")}</div>`;
+  const card = (r) => `<div class="runcard"><div class="dot ${r.ck ? "" : "w"}">${ic(r.ck ? "check" : "clock")}</div>
+    <div class="tx"><div class="t-title">${FIG(r.d)}</div><div class="t-body">${FIG(r.f + ", " + r.s)}</div>
+    ${r.early ? `<div class="t-bodym var">Stopped early</div>` : `<div class="t-bodym var">${r.end}</div>`}
+    ${r.ck ? `<div class="t-bodymm pri">Backed up and checked</div>` : ""}
+    ${r.sp ? `<div class="t-bodym var">${r.sp}</div>` : ""}</div></div>`;
+  let list = "";
+  if (hs.state === "empty") list = `<div class="t-title">No Backup runs yet</div>`;
+  else if (hs.view === "month") list = months().map((m) => `<div class="monthrow"><div class="strip4">${tilesHue(4, m.seed)}</div><div><div class="t-large" style="font:400 calc(22px*var(--fs))/1.2 var(--serif)">${m.m}</div><div class="t-bodym var">${m.t}</div></div></div>${m.runs.map(card).join("")}`).join("");
+  else list = allRuns().map(card).join("");
+  const note = driveOut() ? `<div class="card" style="display:flex;gap:12px;align-items:center;padding:14px 16px">${ic("info")}<span class="t-body">As of 13 Oct 2026, 9:00 pm</span></div>` : "";
+  return `<div class="topbar"><div class="ib">${ic("back")}</div><div class="t-large" style="font:400 calc(22px*var(--fs))/1.27 var(--serif)">Backup history</div></div>
+  <div class="h-now">${note}${seg}<div class="verify" style="${driveOut() ? "opacity:.45" : ""}">Verify everything</div>${list}</div>`;
+}
+
+/* ---- PROPOSED ---- */
+function historyNew() {
+  const runs = allRuns();
+  const bad = runs.filter((r) => !r.ck).length;
+  let sentence, ok = true;
+  if (hs.state === "empty") sentence = "No Backup runs yet";
+  else if (driveOut()) { sentence = "As of 13 Oct, 9:00 pm"; ok = false; }
+  else if (bad === 0) sentence = "Everything is Backed up and checked";
+  else { sentence = bad === 1 ? "1 Backup run stopped early" : `${bad} Backup runs stopped early`; ok = false; }
+  const verify = hs.state === "empty" ? "" : `<button class="txtbtn" style="min-height:40px;padding:0 4px;${driveOut() ? "opacity:.45" : ""}">Verify everything</button>`;
+  const seg = `<div class="seg compact" style="align-self:flex-start">${[["month", "By month"], ["backup", "By backup"]].map(([k, t]) => `<button class="${hs.view === k ? "sel" : ""}" data-hview="${k}">${t}</button>`).join("")}</div>`;
+  const row = (r, id) => {
+    const open = hs.open.has(id);
+    const st = r.ck ? `<span class="st ok t-bodymm">${ic("tick")}Checked</span>` : `<span class="st w t-bodymm">${ic("clock")}Stopped early</span>`;
+    const more = r.early ? "" : `<div class="more t-bodym">${r.end}${r.sp ? " · " + r.sp : ""}</div>`;
+    return `<div class="runwrap ${open ? "open" : ""}"><button class="run" data-run="${id}" aria-expanded="${open}"><span class="tx"><span class="t-title">${FIG(r.d.replace(/ 20\d\d/, ""))}</span><span class="t-bodym var">${FIG(r.f + " · " + r.s)}</span></span>${st}</button>${more}</div>`;
+  };
+  let body = "";
+  if (hs.state === "empty") {
+    body = `<div class="empty"><div class="t-head" style="font-size:calc(30px*var(--fs))">No Backup runs yet</div><div class="t-body var">Each Backup run is listed here once it has finished.</div></div>`;
+  } else if (hs.view === "month") {
+    let id = 0;
+    body = months().map((m) => `<div class="month"><div class="mhead"><div class="strip4">${tilesHue(4, m.seed)}</div><div class="tx"><div class="t-month">${FIG(m.m)}</div><div class="t-bodym var">${FIG(m.t.replace(", ", " · "))}</div></div></div>${m.runs.map((r) => row(r, "m" + id++)).join("")}</div>`).join("");
+  } else {
+    let id = 0;
+    body = `<div class="month">${allRuns().map((r) => row(r, "b" + id++)).join("").replace(/^<div class="runwrap/, '<div class="runwrap')}</div>`;
+  }
+  return `<div class="topbar"><div class="ib">${ic("back")}</div><div class="t-month" style="font-size:calc(22px*var(--fs))">Backup history</div></div>
+  <div class="h-new">
+    <div class="hstrip"><span class="s ${ok ? "pri" : "var"}">${ic(ok ? "shield" : "clock")}<span class="t-bodymm">${sentence}</span></span>${verify}</div>
+    ${hs.state === "empty" ? "" : seg}
+    ${body}
+  </div>`;
+}
+
+/* ================= ONBOARDING ================= */
+let os = { step: 0, photos: "ask", drive: "none", preset: "balanced", sheet: false };
+const STEPS = ["Welcome", "Photos", "Drive", "Previews", "Ready"];
+const PRESETS = [
+  { k: "smaller", n: "Smaller", d: "Fits the most. Fine for finding a photo. Soft when you zoom.", pv: "Preview 48 KB", est: "22 MB estimate", hue: 200 },
+  { k: "balanced", n: "Balanced", d: "Looks good on the phone screen.", pv: "Preview 120 KB", est: "58 MB estimate", hue: 170, rec: true },
+  { k: "sharper", n: "Sharper", d: "Stays crisp when you zoom in. Takes more room on the phone.", pv: "Preview 410 KB", est: "198 MB estimate", hue: 150 },
+];
+const pname = () => PRESETS.find((p) => p.k === os.preset).n;
+const img = (hue, cls = "qimg") => `<div class="${cls} tile" style="--a:${hue};--b:${hue + 55}"></div>`;
+
+/* ---- NOW (5 steps, copied from OnboardingScreen.kt) ---- */
+function onboardingNow() {
+  const step = os.step, label = `<div class="t-title var">Step ${step + 1} of 5</div>`;
+  const back = step > 0 ? `<button class="backb">${ic("back")}Back</button>` : "";
+  const title = (t) => `<div class="t-head" style="font-size:calc(34px*var(--fs))">${t}</div>`;
+  const big = (t, cls = "") => `<div class="btn ${cls}">${t}</div>`;
+  const quiet = (t) => `<div class="txtbtn" style="align-self:flex-start">${t}</div>`;
+  let inner = "";
+  if (step === 0) inner = `${label}${title("Photoxpo copies your photos and videos to your Archive Drive and keeps a small Preview of each one on your phone.")}${big("Get started")}`;
+  if (step === 1) {
+    inner = `${back}${label}${title("Let Photoxpo see your photos")}<div class="t-body">Photoxpo needs to see your camera photos and videos so it can back them up. It only reads them. It never changes or deletes anything.</div>`;
+    if (os.photos !== "allowed") inner += `<div class="t-body">On the next screen, choose Allow all.</div><div class="t-body var">If you select photos, the rest will not be Backed up.</div>`;
+    if (os.photos === "allowed") inner += `<div class="note ok">${ic("check")}<span class="t-body">Photoxpo can see your photos.</span></div>${big("Continue")}`;
+    else if (os.photos === "denied") inner += `<div class="note err"><div><div class="t-title">Photos are not allowed</div><div class="t-body">Photoxpo cannot back up photos it cannot see. Open Settings, then choose Photos and allow all.</div></div></div>${big("Open Settings")}${quiet("Try again")}`;
+    else inner += big("Allow access to photos");
+  }
+  if (step === 2) {
+    inner = `${back}${label}${title("Choose your Archive Drive")}<div class="t-body">Plug in your Archive Drive first. Then choose its folder. This is where your Originals will live.</div>`;
+    if (os.drive === "chosen") inner += `<div class="note ok">${ic("check")}<span class="t-body">Archive Drive ready. Your Originals will go in a folder called Photoxpo.</span></div>${big("Continue")}${quiet("Choose again")}`;
+    else {
+      if (os.drive === "error") inner += `<div class="note err"><span class="t-body">This Archive Drive can only be read. Choose a folder Photoxpo can write to.</span></div>`;
+      inner += `${big("Choose Archive Drive")}${quiet("Do this later")}<div class="t-body var">Nothing is Backed up until you choose an Archive Drive.</div>`;
+    }
+  }
+  if (step === 3) {
+    inner = `${back}${label}${title("How should your Previews look?")}<div class="t-body">A Preview is the small copy that on your phone. Your Original stays on the Archive Drive.</div>
+    <div class="card" style="display:flex;gap:12px;align-items:center;padding:12px 16px"><div style="flex:1"><div class="t-title">Your photo</div><div class="t-bodym var">IMG_20261013_210948908_HDR.jpg<br>Original 4.1 MB</div></div><div class="btn tonal" style="width:auto;min-height:48px;padding:0 16px;font-size:14px">Try another photo</div></div>
+    ${PRESETS.map((p) => `<div class="qcard ${os.preset === p.k ? "sel" : ""}"><div class="row"><span class="t-title">${p.n}</span>${p.rec ? `<span class="badge2 t-label">Recommended</span>` : ""}</div><div class="t-bodym var">${p.d}</div>${img(p.hue)}<div class="t-bodym">${p.pv}</div><div class="t-bodym">${p.est}</div></div>`).join("")}
+    ${big("Use " + pname())}`;
+  }
+  if (step === 4) {
+    inner = `${back}${label}${title("You are ready")}<div class="t-body">${os.drive === "chosen" ? "Archive Drive chosen" : "Archive Drive not chosen yet"}</div><div class="t-body">Previews ${pname()}</div>${os.drive === "chosen" ? `<div class="t-body">The first backup takes hours and can be paused. You can unplug your drive any time; backup carries on when you plug it back in.</div>` : ""}${big(os.drive === "chosen" ? "Start backup" : "Open the app")}`;
+  }
+  return `<div class="o-now">${inner}</div>`;
+}
+
+/* ---- PROPOSED (4 screens + a sheet for Previews) ---- */
+const MAP = [0, 1, 2, 3, 3]; // the proposal folds "Previews" into the Ready screen
+function onboardingNew() {
+  const idx = Math.min(os.step, 3) , showSheet = os.step === 3;
+  const progress = `<div class="prog" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="${(os.step === 4 ? 3 : os.step) + 1}" aria-label="Step ${(os.step === 4 ? 3 : os.step) + 1} of 4">${[0, 1, 2, 3].map((k) => `<i class="${k <= idx ? "on" : ""}"></i>`).join("")}</div>`;
+  const effective = os.step === 4 ? 3 : os.step; // step 3 = Ready with the Previews sheet open
+  const top = `<div class="otop"><div class="ib ${effective === 0 ? "ph" : ""}">${ic("back")}</div>${progress}</div>`;
+  const big = (t, cls = "") => `<div class="btn ${cls}">${t}</div>`;
+  let content = "", actions = "";
+  const head = (t) => `<div class="t-head">${t}</div>`;
+  if (effective === 0) {
+    content = `<div style="align-self:flex-start">${logo(44)}</div>
+      <div class="diagram" aria-label="Your Original goes to your drive; a Preview on your phone">
+        <div class="node"><div class="box"><div class="grid3">${tilesHue(9, 4)}</div></div><div class="t-bodymm">Preview</div><div class="t-bodym var" style="margin-top:-6px">on your phone</div></div>
+        <div class="arrow">${ic("arrow", "", "width:28px;height:28px")}</div>
+        <div class="node"><div class="box">${ic("drive", "pri", "width:56px;height:56px")}</div><div class="t-bodymm">Original</div><div class="t-bodym var" style="margin-top:-6px">on your drive</div></div>
+      </div>
+      ${head("Your photos, safe on your own drive.")}
+      <div class="t-body var">Photoxpo copies your photos and videos to a USB drive and keeps a small Preview of each one on your phone.</div>`;
+    actions = big("Get started");
+  } else if (effective === 1) {
+    content = `${head("Let Photoxpo see your photos")}
+      <div class="card" style="display:flex;gap:14px;align-items:flex-start">${ic("photos", "pri", "width:28px;height:28px")}<div><div class="t-title">Photos and videos</div><div class="t-body var">Photoxpo only reads them. It never changes or deletes anything.</div></div></div>`;
+    if (os.photos === "ask") content += `<div><div class="t-bodym var" style="margin-bottom:8px">Your phone will ask next. Choose Allow all:</div>
+      <div class="sysmock" aria-hidden="true"><div class="opt hl"><span class="t-bodymm">Allow all</span>${ic("tick")}</div><div class="opt"><span class="t-bodym">Select photos and videos</span></div><div class="opt"><span class="t-bodym">Don’t allow</span></div></div>
+      <div class="t-bodym var" style="margin-top:8px">If you select photos, the rest will not be Backed up.</div></div>`;
+    if (os.photos === "allowed") content += `<div class="note ok">${ic("check")}<span class="t-body">Photoxpo can see your photos.</span></div>`;
+    if (os.photos === "denied") content += `<div class="note err"><div><div class="t-title">Photos are not allowed</div><div class="t-body">Photoxpo cannot back up photos it cannot see. Open Settings, then choose Photos and allow all.</div></div></div>`;
+    actions = os.photos === "allowed" ? big("Continue") : os.photos === "denied" ? `${big("Open Settings")}<div class="txtbtn" style="align-self:center">Try again</div>` : big("Allow access to photos");
+  } else if (effective === 2) {
+    content = `${head("Choose your Archive Drive")}
+      <div class="srow"><div class="stepno">1</div><div><div class="t-title">Plug in your Archive Drive</div></div></div>
+      <div class="srow"><div class="stepno">2</div><div><div class="t-title">Choose its folder</div><div class="t-body var">This is where your Originals will live.</div></div></div>`;
+    if (os.drive === "chosen") content += `<div class="note ok">${ic("check")}<span class="t-body">Archive Drive ready. Your Originals will go in a folder called Photoxpo.</span></div>`;
+    if (os.drive === "error") content += `<div class="note err"><span class="t-body">This Archive Drive can only be read. Choose a folder Photoxpo can write to.</span></div>`;
+    if (os.drive === "chosen") actions = `${big("Continue")}<div class="txtbtn" style="align-self:center">Choose again</div>`;
+    else actions = `${big("Choose Archive Drive")}<div class="txtbtn" style="align-self:center">Do this later</div><div class="t-bodym var" style="text-align:center">Nothing is Backed up until you choose an Archive Drive.</div>`;
+  } else {
+    const chosen = os.drive === "chosen";
+    content = `${head("You are ready")}
+      <div class="card" style="padding:4px 16px">
+        <div class="sumrow"><div class="l">${ic(chosen ? "check" : "clock", chosen ? "pri" : "var")}<div><div class="t-title">Archive Drive</div><div class="t-bodym var">${chosen ? "Chosen" : "Not chosen yet"}</div></div></div>${chosen ? "" : `<div class="txtbtn" style="min-height:40px;padding:0">Choose</div>`}</div>
+        <div class="sumrow"><div class="l">${ic("photos", "pri")}<div><div class="t-title">Previews</div><div class="t-bodym var">${pname()}${os.preset === "balanced" ? " · Recommended" : ""}</div></div></div><div class="txtbtn" data-sheet="1" style="min-height:40px;padding:0">Change</div></div>
+      </div>
+      ${chosen ? `<div class="t-bodym var">The first backup takes hours and can be paused. You can unplug your drive any time; backup carries on when you plug it back in.</div>` : ""}`;
+    actions = big(chosen ? "Start backup" : "Open the app");
+  }
+  const sheet = showSheet ? `<div class="sheetscrim"><div class="sheet">
+      <div class="t-title2">How should your Previews look?</div>
+      <div class="t-bodym var">A Preview is the small copy that on your phone. Your Original stays on the Archive Drive.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div><div class="t-title">Your photo</div><div class="t-bodym var">Original 4.1 MB</div></div><div class="txtbtn" style="min-height:40px;padding:0">Try another</div></div>
+      ${PRESETS.map((p) => `<div class="opt3 ${os.preset === p.k ? "sel" : ""}" data-preset="${p.k}">${img(p.hue)}<div class="tx"><div style="display:flex;gap:4px 8px;align-items:center;flex-wrap:wrap"><span class="t-title">${p.n}</span>${p.rec ? `<span class="badge2 t-label">Recommended</span>` : ""}</div><div class="t-bodym var">${p.d}</div><div class="t-bodym">${p.pv.replace("Preview ", "")} · ${p.est.replace(" estimate", "")}</div></div><div class="radio"></div></div>`).join("")}
+      ${big("Use " + pname())}</div></div>` : "";
+  return `<div class="o-new">${top}<div class="ocontent">${content}</div><div class="oactions">${actions}</div></div>${sheet}`;
+}
+
+/* ================= shell ================= */
+let screen = "history";
+function render() {
+  const sb = `<div class="sb"><span>9:41</span><span>62%</span></div>`;
+  const phone = (inner, scrolls = true) => `<div class="phone"><div class="screen">${sb}<div class="body">${inner}</div></div></div>`;
+  const hist = screen === "history";
+  const L = hist ? historyNow() : onboardingNow();
+  const R = hist ? historyNew() : onboardingNew();
+  const rWrap = hist ? phone(R) : `<div class="phone"><div class="screen">${sb}${R}</div></div>`;
+  $("#stage").innerHTML = `<div class="col"><div class="cap">Now</div>${phone(L)}</div><div class="col"><div class="cap new">Proposed</div>${rWrap}</div>`;
+  $("#hstates").style.display = hist ? "" : "none";
+  $("#osteps").style.display = hist ? "none" : "";
+  $("#ostates").style.display = hist ? "none" : "";
+  document.querySelectorAll("#screens .chipb").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === screen));
+  document.querySelectorAll("#hstates .chipb").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === hs.state));
+  document.querySelectorAll("#osteps .chipb").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.k === os.step));
+  renderOStates();
+  renderNotes();
+  // delegated handlers inside the phones
+  document.querySelectorAll("[data-hview]").forEach((b) => (b.onclick = () => { hs.view = b.dataset.hview; render(); }));
+  document.querySelectorAll("[data-run]").forEach((b) => (b.onclick = () => { const id = b.dataset.run; hs.open.has(id) ? hs.open.delete(id) : hs.open.add(id); render(); }));
+  document.querySelectorAll("[data-sheet]").forEach((b) => (b.onclick = () => { os.step = 3; render(); }));
+  document.querySelectorAll("[data-preset]").forEach((b) => (b.onclick = () => { os.preset = b.dataset.preset; render(); }));
+}
+function renderOStates() {
+  const box = $("#ostates");
+  const opts = os.step === 1 ? ["photos", [["ask", "Not asked yet"], ["allowed", "Allowed"], ["denied", "Denied"]]]
+    : os.step === 2 ? ["drive", [["none", "Not chosen"], ["chosen", "Chosen"], ["error", "Read-only error"]]]
+    : os.step >= 3 ? ["drive", [["none", "No drive chosen"], ["chosen", "Drive chosen"]]] : null;
+  box.innerHTML = "";
+  if (!opts) return;
+  const l = document.createElement("span"); l.className = "lab"; l.textContent = "State"; box.append(l);
+  opts[1].forEach(([k, t]) => {
+    const b = document.createElement("button"); b.className = "chipb"; b.textContent = t; b.setAttribute("aria-pressed", os[opts[0]] === k);
+    b.onclick = () => { os[opts[0]] = k; render(); }; box.append(b);
+  });
+}
+function renderNotes() {
+  const n = $("#notes");
+  if (screen === "history") n.innerHTML = `
+    <section><h2>What changed on History</h2><ul>
+      <li>Each run is two lines and one word (<b>Checked</b>) instead of five lines. Tap a run for the speed and why it ended.</li>
+      <li>Runs sit inside their month, so there is one card per month instead of a card per run.</li>
+      <li>One sentence says whether everything is checked, like the strip on Photos. <b>Verify everything</b> moves into it.</li>
+      <li>MB/s is no longer in the list: it is a number for the builder, kept one tap away.</li></ul></section>
+    <section><h2>Check these</h2><ul><li>Try <b>Mixed</b> for a run that was cut off, <b>Drive not connected</b> and <b>Empty</b>.</li><li>Tap <b>By backup</b> and tap any run.</li></ul></section>`;
+  else n.innerHTML = `
+    <section><h2>What changed in onboarding</h2><ul>
+      <li><b>5 screens become 4.</b> Preview quality leaves the main path: Balanced is the default and “Change” on the last screen opens it as a sheet.</li>
+      <li>“Step 2 of 5” text becomes a thin 4-part bar with a back arrow.</li>
+      <li>The Photos step shows what your phone will ask, with <b>Allow all</b> marked, instead of two sentences about it.</li>
+      <li>Welcome shows the one idea (Original on the drive, Preview on the phone) as a picture before the words.</li>
+      <li>The primary button sits at the bottom, under the thumb, on every step.</li></ul></section>
+    <section><h2>Research that shaped it</h2><ul>
+      <li>komoot, Halide: one plain screen naming the permission and why, before the system prompt.</li>
+      <li>Dropbox camera uploads: options are one screen after the choice, then it lands on a backup status.</li>
+      <li>Brilliant, Joi: back arrow plus a thin progress bar, not a “step n of m” label.</li></ul></section>`;
+}
+[["history", "History"], ["onboarding", "Onboarding"]].forEach(([k, t]) => {
+  const b = document.createElement("button"); b.className = "chipb"; b.dataset.k = k; b.textContent = t; b.onclick = () => { screen = k; render(); }; $("#screens").append(b);
+});
+[["normal", "All checked"], ["mixed", "Mixed"], ["driveOut", "Drive not connected"], ["empty", "Empty"]].forEach(([k, t]) => {
+  const b = document.createElement("button"); b.className = "chipb"; b.dataset.k = k; b.textContent = t; b.onclick = () => { hs.state = k; hs.open.clear(); render(); }; $("#hstates").append(b);
+});
+STEPS.forEach((t, k) => {
+  const b = document.createElement("button"); b.className = "chipb"; b.dataset.k = k; b.textContent = `${k + 1} ${t}`; b.onclick = () => { os.step = k; render(); }; $("#osteps").append(b);
+});
+$("#theme").onclick = (e) => { const d = dark(); document.body.dataset.theme = d ? "light" : "dark"; e.target.setAttribute("aria-pressed", !d); e.target.textContent = d ? "Dark" : "Light"; render(); };
+$("#large").onclick = (e) => { const on = e.target.getAttribute("aria-pressed") !== "true"; document.documentElement.style.setProperty("--fs", on ? 1.3 : 1); e.target.setAttribute("aria-pressed", on); };
+const q = new URLSearchParams(location.search);
+if (q.get("screen")) screen = q.get("screen");
+if (q.get("h")) hs.state = q.get("h");
+if (q.get("view")) hs.view = q.get("view");
+if (q.get("step")) os.step = +q.get("step");
+if (q.get("photos")) os.photos = q.get("photos");
+if (q.get("drive")) os.drive = q.get("drive");
+if (q.get("open")) q.get("open").split(",").forEach((x) => hs.open.add(x));
+if (q.get("dark")) document.body.dataset.theme = "dark";
+if (q.get("large")) document.documentElement.style.setProperty("--fs", 1.3);
+render();
+</script>
+</body>
+</html>
