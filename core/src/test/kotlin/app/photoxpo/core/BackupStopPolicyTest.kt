@@ -146,6 +146,62 @@ class BackupStopPolicyTest {
         assertTrue(drive.exists(files[0].path))
     }
 
+    @Test
+    fun lowBatteryConstant_isFifteenPercent() {
+        assertEquals(15, LOW_BATTERY_PERCENT)
+    }
+
+    @Test
+    fun runStopsAfterTheCurrentFile_atLowBatteryWhileNotCharging() {
+        val root = folders.newFolder("battery").toPath()
+        val drive = FakeArchiveDrive(root)
+        val files = (1..5).map { sample(it, size = 4) }
+        // 20% before the first file, 16% before the second, 15% before the third.
+        val levels = ArrayDeque(listOf(20, 16, 15, 14, 13))
+        val result = BackupRunner(
+            mediaSource = FakeMediaSource(files.map { it.file to it.bytes }),
+            archiveDrive = drive,
+            clock = Clock.fixed(START, ZoneOffset.UTC),
+            batteryInput = BatteryInput { BatteryStatus(levels.removeFirst(), charging = false) },
+        ).start()
+
+        assertEquals(BackupRunStatus.Completed, result.status)
+        assertEquals(StopReason.LowBattery, result.stopReason)
+        assertEquals(3, result.filesLeft)
+        assertEquals(2, result.items.count { it.state == ItemState.COMMITTED })
+        assertFalse(drive.exists(files[2].path))
+        assertNoPartFiles(root)
+    }
+
+    @Test
+    fun noStopAtLowBattery_whileCharging() {
+        val root = folders.newFolder("charging").toPath()
+        val drive = FakeArchiveDrive(root)
+        val files = (1..3).map { sample(it, size = 4) }
+        val result = BackupRunner(
+            mediaSource = FakeMediaSource(files.map { it.file to it.bytes }),
+            archiveDrive = drive,
+            clock = Clock.fixed(START, ZoneOffset.UTC),
+            batteryInput = BatteryInput { BatteryStatus(5, charging = true) },
+        ).start()
+
+        assertNull(result.stopReason)
+        assertEquals(0, result.filesLeft)
+        assertTrue(files.all { drive.exists(it.path) })
+    }
+
+    @Test
+    fun unknownBattery_neverStops() {
+        val progress = RunProgress(copiedBytes = 0, elapsed = Duration.ZERO, nextFileBytes = 1)
+        assertNull(DefaultStopPolicy().reasonToStop(progress))
+        assertEquals(
+            StopReason.LowBattery,
+            DefaultStopPolicy().reasonToStop(progress.copy(batteryPercent = 15, charging = false)),
+        )
+        assertNull(DefaultStopPolicy().reasonToStop(progress.copy(batteryPercent = 16, charging = false)))
+        assertNull(DefaultStopPolicy().reasonToStop(progress.copy(batteryPercent = 3, charging = true)))
+    }
+
     private fun assertNoPartFiles(root: java.nio.file.Path) {
         val parts = Files.walk(root).use { stream ->
             stream.filter { it.fileName?.toString()?.endsWith(".photoxpo-part") == true }.toList()

@@ -65,6 +65,7 @@ class BackupRunner(
     private val previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     private val newDriveId: () -> String = { UUID.randomUUID().toString() },
     private val stopPolicy: StopPolicy = DefaultStopPolicy(),
+    private val batteryInput: BatteryInput = BatteryInput { null },
     private val previewPreset: PreviewPreset? = null,
     private val isCancelled: () -> Boolean = { false },
     private val checkPolicy: CheckPolicy = CheckPolicy.skipRecentlyChecked(),
@@ -131,13 +132,18 @@ class BackupRunner(
                     continue
                 }
                 // Once the run decides to stop, it only finishes Originals that need no new copy.
-                val reasonNow = stopReason ?: stopPolicy.reasonToStop(
-                    RunProgress(
-                        copiedBytes = copiedBytes,
-                        elapsed = Duration.between(startedAt, clock.instant()),
-                        nextFileBytes = file.sizeBytes,
-                    ),
-                )
+                val reasonNow = stopReason ?: run {
+                    val battery = batteryInput.read()
+                    stopPolicy.reasonToStop(
+                        RunProgress(
+                            copiedBytes = copiedBytes,
+                            elapsed = Duration.between(startedAt, clock.instant()),
+                            nextFileBytes = file.sizeBytes,
+                            batteryPercent = battery?.percent,
+                            charging = battery?.charging ?: false,
+                        ),
+                    )
+                }
                 val copied = copier.copy(file, allowNewCopy = reasonNow == null)
                 if (copied.deferredByCap) {
                     stopReason = reasonNow
@@ -277,6 +283,7 @@ fun startBackupRun(
     previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     newDriveId: () -> String = { UUID.randomUUID().toString() },
     stopPolicy: StopPolicy = DefaultStopPolicy(),
+    batteryInput: BatteryInput = BatteryInput { null },
     previewPreset: PreviewPreset? = null,
 ): BackupRunResult {
     return BackupRunner(
@@ -289,6 +296,7 @@ fun startBackupRun(
         previews = previews,
         newDriveId = newDriveId,
         stopPolicy = stopPolicy,
+        batteryInput = batteryInput,
         previewPreset = previewPreset,
     ).start()
 }

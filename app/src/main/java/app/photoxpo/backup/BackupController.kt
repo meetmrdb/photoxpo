@@ -313,6 +313,7 @@ class BackupController private constructor(
                         backedUpLedger = progressLedger(recorded, sizeById),
                         previewPreset = settings.previewPreset(),
                         isCancelled = { cancel.get() },
+                        batteryInput = AndroidBatteryInput(appContext),
                     ).start()
                     RunOutcome(result, probeOrAbsent(uri))
                 } finally {

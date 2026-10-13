@@ -198,6 +198,28 @@ class HomeUiModelTest {
     }
 
     @Test
+    fun lowBatteryStop_showsPausedHeadlineWithFilesLeft_asNormalProgress() {
+        val model = homeUiModel(
+            base(
+                status = BackupStatus.Done,
+                backedUpCount = 340,
+                totalCount = 4000,
+                filesLeft = 3660,
+                stopReason = StopReason.LowBattery,
+            ),
+            NOW,
+            locale = java.util.Locale.US,
+        )
+        assertEquals(
+            "Paused at 15% battery. 3,660 files left. Charge, then reconnect your drive.",
+            model.filesLeftLine,
+        )
+        assertEquals("Back up more", model.primaryLabel)
+        assertNull(model.offlineBanner)
+        assertFalse(model.primaryPauses)
+    }
+
+    @Test
     fun oneFileLeft_usesTheSingular_andNoStopMeansNoLine() {
         val one = homeUiModel(
             base(status = BackupStatus.Done, backedUpCount = 3, totalCount = 4, filesLeft = 1, stopReason = StopReason.TimeLimit),
