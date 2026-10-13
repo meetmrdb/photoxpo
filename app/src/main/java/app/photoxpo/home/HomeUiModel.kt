@@ -10,6 +10,8 @@ import app.photoxpo.backup.PauseReason
 import app.photoxpo.backup.SessionAccess
 import app.photoxpo.backup.backupProgressText
 import app.photoxpo.backup.sessionAccessMessage
+import app.photoxpo.core.LOW_BATTERY_PERCENT
+import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.onboarding.MediaAccessState
 import app.photoxpo.onboarding.accessWarning
@@ -85,7 +87,11 @@ fun homeUiModel(
 private fun filesLeftLine(state: BackupUiState, locale: Locale): String? {
     if (state.stopReason == null || state.filesLeft <= 0) return null
     val count = java.text.NumberFormat.getIntegerInstance(locale).format(state.filesLeft)
-    return if (state.filesLeft == 1) "$count file left" else "$count files left"
+    val left = if (state.filesLeft == 1) "$count file left" else "$count files left"
+    if (state.stopReason == StopReason.LowBattery) {
+        return "Paused at $LOW_BATTERY_PERCENT% battery. $left. Charge, then reconnect your drive."
+    }
+    return left
 }
 
 /** Everything in the Camera folder is Backed up, so there is nothing to start until a new photo appears. */
