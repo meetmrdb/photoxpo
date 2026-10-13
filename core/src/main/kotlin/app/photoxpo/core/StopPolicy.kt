@@ -22,6 +22,9 @@ fun interface BatteryInput {
     fun read(): BatteryStatus?
 }
 
+/** Safety stop, well before Android's 6 hour foreground-service limit. Ends as a normal [StopReason.TimeLimit]. */
+val RUN_HARD_STOP: Duration = Duration.ofHours(5)
+
 /**
  * Why a Backup run ended before every Original was Backed up. Each one is a normal result, never an error.
  * Later reasons (low battery, Android's time limit, Archive Drive full) are added here and in a [StopPolicy].
@@ -53,11 +56,12 @@ fun interface StopPolicy {
 class DefaultStopPolicy(
     private val maxCopiedBytes: Long = RUN_SIZE_LIMIT_BYTES,
     private val maxElapsed: Duration = RUN_TIME_LIMIT,
+    private val hardStop: Duration = RUN_HARD_STOP,
 ) : StopPolicy {
     override fun reasonToStop(progress: RunProgress): StopReason? {
         val battery = progress.batteryPercent
         if (battery != null && battery <= LOW_BATTERY_PERCENT && !progress.charging) return StopReason.LowBattery
-        if (progress.elapsed >= maxElapsed) return StopReason.TimeLimit
+        if (progress.elapsed >= minOf(maxElapsed, hardStop)) return StopReason.TimeLimit
         // The first copy always goes ahead, so one Original bigger than the limit is not stuck forever.
         if (progress.copiedBytes > 0 && progress.copiedBytes + progress.nextFileBytes > maxCopiedBytes) {
             return StopReason.SizeLimit
