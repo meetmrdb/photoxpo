@@ -188,7 +188,7 @@ class HomeUiModelTest {
             NOW,
             locale = java.util.Locale.US,
         )
-        assertEquals("Time limit reached. 3,660 files left.", model.statusSentence)
+        assertEquals("Size limit reached. 3,660 files left.", model.statusSentence)
         assertEquals("Backed up 340 of 4000", model.progressText)
         assertEquals("Back up more", model.primaryLabel)
         assertTrue(model.showProgress)

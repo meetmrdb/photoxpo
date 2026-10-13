@@ -101,7 +101,8 @@ private fun stopHeadline(state: BackupUiState, locale: Locale): String? {
     val left = if (state.filesLeft == 1) "$count file left" else "$count files left"
     return when (reason) {
         StopReason.LowBattery -> "Paused at $LOW_BATTERY_PERCENT% battery. $left. Charge, then reconnect your drive."
-        StopReason.SizeLimit, StopReason.TimeLimit -> "Time limit reached. $left."
+        StopReason.SizeLimit -> "Size limit reached. $left."
+        StopReason.TimeLimit -> "Time limit reached. $left."
         StopReason.DriveFull -> null
     }
 }
