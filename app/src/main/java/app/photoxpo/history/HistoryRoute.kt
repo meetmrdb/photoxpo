@@ -52,6 +52,16 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -235,6 +245,9 @@ fun HistoryScreen(
     previewCache: PreviewBitmapCache? = null,
     verify: VerifyEverythingUi? = null,
 ) {
+    var open by rememberSaveable { mutableStateOf(setOf<String>()) }
+    val toggle: (String) -> Unit = { run -> open = if (run in open) open - run else open + run }
+    val empty = if (model.grouping == HistoryGrouping.ByMonth) model.sections.isEmpty() else model.rows.isEmpty()
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -257,51 +270,84 @@ fun HistoryScreen(
                 .fillMaxSize(),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                model.asOfLabel?.let { label -> AsOfNote(label) }
-                GroupingToggle(grouping = model.grouping, onGrouping = onGrouping)
-                verify?.let { VerifyEverythingRow(it) }
+                StatusStrip(model, verify)
+                verify?.message?.let { message ->
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (!empty) GroupingToggle(grouping = model.grouping, onGrouping = onGrouping)
             }
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                when (model.grouping) {
-                    HistoryGrouping.ByMonth -> {
-                        if (model.sections.isEmpty()) {
-                            item(key = "empty") { EmptyHistory() }
-                        } else {
-                            for (section in model.sections) {
-                                item(key = "month-${section.monthLabel}") {
-                                    MonthHeading(section, strips[section.monthLabel], previewCache)
-                                }
-                                items(
-                                    items = section.rows,
-                                    key = { row -> row.runFile },
-                                ) { row ->
-                                    BackupRow(row)
-                                }
-                            }
+            if (empty) {
+                EmptyHistory()
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    when (model.grouping) {
+                        HistoryGrouping.ByMonth -> items(
+                            items = model.sections,
+                            key = { section -> "month-${section.monthLabel}" },
+                        ) { section ->
+                            MonthCard(section, strips[section.monthLabel], previewCache, open, toggle)
                         }
-                    }
-                    HistoryGrouping.ByBackup -> {
-                        if (model.rows.isEmpty()) {
-                            item(key = "empty") { EmptyHistory() }
-                        } else {
-                            items(
-                                items = model.rows,
-                                key = { row -> row.runFile },
-                            ) { row ->
-                                BackupRow(row)
-                            }
+                        HistoryGrouping.ByBackup -> item(key = "backups") {
+                            RunsCard(model.rows, open, toggle, withYear = true)
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** One sentence on whether everything is checked (or when the list was last true), with Verify everything beside it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatusStrip(model: HistoryUiModel, verify: VerifyEverythingUi?) {
+    val colors = MaterialTheme.colorScheme
+    val asOf = model.asOfLabel
+    val sentence = asOf ?: model.statusLine
+    val good = asOf == null && model.statusOk
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        if (sentence != null) {
+            Row(
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .defaultMinSize(minHeight = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(if (good) R.drawable.ic_check_circle else R.drawable.ic_schedule),
+                    contentDescription = null,
+                    tint = if (good) colors.primary else colors.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = sentence,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = if (good) colors.primary else colors.onSurfaceVariant,
+                )
+            }
+        }
+        if (verify != null && sentence != null) {
+            TextButton(onClick = verify.onVerify, enabled = verify.enabled) {
+                Text(if (verify.running) "Verifying..." else "Verify everything")
             }
         }
     }
@@ -312,61 +358,62 @@ private fun GroupingToggle(
     grouping: HistoryGrouping,
     onGrouping: (HistoryGrouping) -> Unit,
 ) {
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.padding(start = 4.dp)) {
         SegmentedButton(
             selected = grouping == HistoryGrouping.ByMonth,
             onClick = { onGrouping(HistoryGrouping.ByMonth) },
             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
         ) {
-            Text("By month", style = MaterialTheme.typography.titleMedium)
+            Text("By month")
         }
         SegmentedButton(
             selected = grouping == HistoryGrouping.ByBackup,
             onClick = { onGrouping(HistoryGrouping.ByBackup) },
             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
         ) {
-            Text("By backup", style = MaterialTheme.typography.titleMedium)
+            Text("By backup")
         }
     }
 }
 
+/** A month and what it holds, with its Backup runs listed inside, so a run is a row and not a card. */
 @Composable
-private fun VerifyEverythingRow(verify: VerifyEverythingUi) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = verify.onVerify, enabled = verify.enabled) {
-            Text(if (verify.running) "Verifying..." else "Verify everything")
-        }
-        verify.message?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun AsOfNote(label: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Top,
+private fun MonthCard(
+    section: HistoryMonthSection,
+    stripHashes: List<String>?,
+    previewCache: PreviewBitmapCache?,
+    open: Set<String>,
+    onToggle: (String) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_info),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp),
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column {
+            MonthHeading(section, stripHashes, previewCache)
+            section.rows.forEach { row -> RunRow(row, row.runFile in open, onToggle, withYear = false) }
+        }
+    }
+}
+
+@Composable
+private fun RunsCard(
+    rows: List<HistoryBackupRow>,
+    open: Set<String>,
+    onToggle: (String) -> Unit,
+    withYear: Boolean,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column {
+            rows.forEachIndexed { index, row ->
+                RunRow(row, row.runFile in open, onToggle, withYear, divider = index > 0)
+            }
+        }
     }
 }
 
@@ -377,15 +424,15 @@ private fun MonthHeading(
     previewCache: PreviewBitmapCache?,
 ) {
     Row(
-        modifier = Modifier.padding(top = 8.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (!stripHashes.isNullOrEmpty() && previewCache != null) {
             Row(
                 modifier = Modifier
-                    .width(if (stripHashes.size >= 3) 112.dp else (56 * stripHashes.size).dp)
-                    .height(56.dp)
+                    .width(if (stripHashes.size >= 3) 84.dp else (42 * stripHashes.size).dp)
+                    .height(48.dp)
                     .clip(RoundedCornerShape(10.dp)),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
@@ -403,7 +450,7 @@ private fun MonthHeading(
                 }
             }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column {
             Text(
                 text = figuresInSans(section.monthLabel, figureSize = 19.sp),
                 modifier = Modifier.semantics { heading() },
@@ -418,91 +465,117 @@ private fun MonthHeading(
     }
 }
 
+/** Two lines and one word. Tapping opens why it ended and how fast, when there is something to say. */
 @Composable
-private fun BackupRow(row: HistoryBackupRow) {
+private fun RunRow(
+    row: HistoryBackupRow,
+    expanded: Boolean,
+    onToggle: (String) -> Unit,
+    withYear: Boolean,
+    divider: Boolean = true,
+) {
     val colors = MaterialTheme.colorScheme
-    val stopped = row.stoppedEarlyLabel != null
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = colors.surfaceContainerHigh,
-    ) {
+    Column {
+        if (divider) HorizontalDivider(color = colors.outlineVariant)
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.Top,
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 64.dp)
+                .then(
+                    if (row.detailLabel != null) {
+                        Modifier.clickable(
+                            onClickLabel = if (expanded) "Hide details" else "Show details",
+                            role = Role.Button,
+                        ) { onToggle(row.runFile) }
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        if (stopped) colors.tertiaryContainer else colors.primaryContainer,
-                        CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painter = painterResource(
-                        if (stopped) R.drawable.ic_schedule else R.drawable.ic_check_circle,
-                    ),
-                    contentDescription = null,
-                    tint = if (stopped) colors.onTertiaryContainer else colors.onPrimaryContainer,
-                    modifier = Modifier.size(24.dp),
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (withYear) row.dateLabel else row.shortDateLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = row.summaryLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
                 )
             }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(text = row.dateLabel, style = MaterialTheme.typography.titleMedium)
+            row.statusLabel?.let { StatusWord(it) }
+        }
+        if (expanded) {
+            row.detailLabel?.let { detail ->
                 Text(
-                    text = "${row.filesLabel}, ${row.sizeLabel}",
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = detail,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
                 )
-                row.stoppedEarlyLabel?.let { label ->
-                    Text(
-                        text = label,
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .background(colors.tertiaryContainer, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 10.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                        color = colors.onTertiaryContainer,
-                    )
-                }
-                row.endReasonLabel?.let { reason ->
-                    Text(
-                        text = reason,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                    )
-                }
-                if (row.checked) {
-                    Text(
-                        text = "Backed up and checked",
-                        modifier = Modifier.padding(top = 4.dp),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                        color = colors.primary,
-                    )
-                }
-                row.speedLabel?.let { speed ->
-                    Text(
-                        text = speed,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                    )
-                }
             }
         }
     }
 }
 
+/** "Checked" in teal with a tick, or "Stopped early" on amber with a clock: the words carry the state, not the colour. */
+@Composable
+private fun StatusWord(label: String) {
+    val colors = MaterialTheme.colorScheme
+    val checked = label == "Checked"
+    Row(
+        modifier = Modifier
+            .then(
+                if (checked) {
+                    Modifier
+                } else {
+                    Modifier
+                        .background(colors.tertiaryContainer, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                },
+            )
+            .semantics { if (checked) contentDescription = "Backed up and checked" },
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(if (checked) R.drawable.ic_check else R.drawable.ic_schedule),
+            contentDescription = null,
+            tint = if (checked) colors.primary else colors.onTertiaryContainer,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            color = if (checked) colors.primary else colors.onTertiaryContainer,
+        )
+    }
+}
+
 @Composable
 private fun EmptyHistory() {
-    Text(
-        text = "No Backup runs yet",
-        style = MaterialTheme.typography.titleMedium,
-    )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "No Backup runs yet",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = "Each Backup run is listed here once it has finished.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 private fun openAttachedArchiveDrive(context: Context): ArchiveDrive? {
