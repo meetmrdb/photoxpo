@@ -69,6 +69,7 @@ private fun summary(runFile: String, text: String): BackupRunSummary? {
         mbPerSecond = if (interrupted) null else footer?.mbPerSecond,
         interrupted = interrupted,
         runEnd = if (interrupted) null else footer?.runEnd,
+        batteryDropPercent = if (interrupted) null else footer?.batteryDropPercent,
     )
 }
 
@@ -79,6 +80,7 @@ private data class FooterFields(
     val elapsedMs: Long?,
     val mbPerSecond: Double?,
     val runEnd: RunEnd?,
+    val batteryDropPercent: Int?,
 )
 
 /**
@@ -126,6 +128,7 @@ private fun Map<String, RunJsonField>.toFooter(): FooterFields {
         elapsedMs = long("elapsedMs"),
         mbPerSecond = double("mbPerSecond"),
         runEnd = RunEnd.fromWire(text("stopReason")),
+        batteryDropPercent = long("batteryDropPercent")?.toInt(),
     )
 }
 

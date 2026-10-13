@@ -112,6 +112,8 @@ class BackupRunner(
                 committed = committed,
                 manifest = manifest,
             )
+            // The first reading the run takes, before it copies anything; the drop is measured from here.
+            var batteryAtStart: BatteryStatus? = null
             var copiedBytes = 0L
             var stopReason: StopReason? = null
             var committedCount = 0
@@ -134,6 +136,7 @@ class BackupRunner(
                 // Once the run decides to stop, it only finishes Originals that need no new copy.
                 val reasonNow = stopReason ?: run {
                     val battery = batteryInput.read()
+                    if (batteryAtStart == null) batteryAtStart = battery
                     stopPolicy.reasonToStop(
                         RunProgress(
                             copiedBytes = copiedBytes,
@@ -172,7 +175,10 @@ class BackupRunner(
             val endedAt = clock.instant()
             archiveDrive.appendText(
                 manifestPath,
-                footerLine(startedAt, endedAt, committedCount, committedBytes, stopReason) + "\n",
+                footerLine(
+                    startedAt, endedAt, committedCount, committedBytes, stopReason,
+                    batteryDropPercent(batteryAtStart, batteryInput.read()),
+                ) + "\n",
             )
             return BackupRunResult(
                 manifestPath = manifestPath,
@@ -354,6 +360,7 @@ private fun footerLine(
     fileCount: Int,
     bytes: Long,
     stopReason: StopReason?,
+    batteryDropPercent: Int?,
 ): String {
     val elapsedMs = Duration.between(startedAt, endedAt).toMillis().coerceAtLeast(0)
     val mbPerSecond = if (elapsedMs == 0L) {
@@ -361,7 +368,7 @@ private fun footerLine(
     } else {
         (bytes.toDouble() / 1_000_000.0) / (elapsedMs.toDouble() / 1000.0)
     }
-    return JsonLine()
+    val line = JsonLine()
         .field("type", "footer")
         .field("startedAt", ISO_MILLIS.format(startedAt))
         .field("endedAt", ISO_MILLIS.format(endedAt))
@@ -371,7 +378,14 @@ private fun footerLine(
         .field("elapsedMs", elapsedMs)
         .field("mbPerSecond", mbPerSecond)
         .field("stopReason", (stopReason?.let { RunEnd.Stopped(it) } ?: RunEnd.Finished).wire)
-        .build()
+    // Only when it can be trusted: a charging phone or an unknown level says nothing about battery use.
+    if (batteryDropPercent != null) line.field("batteryDropPercent", batteryDropPercent.toLong())
+    return line.build()
+}
+
+private fun batteryDropPercent(start: BatteryStatus?, end: BatteryStatus?): Int? {
+    if (start == null || end == null || start.charging || end.charging) return null
+    return (start.percent - end.percent).coerceAtLeast(0)
 }
 
 internal fun MediaKind.wireName(): String = when (this) {
