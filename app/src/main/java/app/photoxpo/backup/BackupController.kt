@@ -320,7 +320,8 @@ class BackupController private constructor(
         val total = if (camera.isEmpty()) _state.value.totalCount else camera.size
         val sizeById = camera.associate { it.id to it.sizeBytes }
         val ledgerKeys = settings.ledgerEntries().keys
-        val bytesToCopy = camera.filter { it.id !in ledgerKeys }.sumOf { it.sizeBytes }
+        val waiting = camera.filter { it.id !in ledgerKeys }
+        val bytesToCopy = waiting.sumOf { it.sizeBytes }
         if (shouldAbandon()) {
             finishAbandoned()
             return
@@ -332,6 +333,7 @@ class BackupController private constructor(
                 totalCount = total,
                 driveStatus = it.driveStatus,
                 bytesToCopy = bytesToCopy,
+                filesToCopy = waiting.size,
             ).copy(backedUpCount = alreadyBackedUp)
         }
         val outcome = try {
