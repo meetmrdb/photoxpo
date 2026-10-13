@@ -11,7 +11,7 @@ import app.photoxpo.history.BackupRunEntity
 
 @Database(
     entities = [PhotoEntity::class, BackupRunEntity::class],
-    version = 2,
+    version = 4,
     exportSchema = false,
 )
 abstract class PhotosDatabase : RoomDatabase() {
@@ -44,6 +44,18 @@ abstract class PhotosDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `backup_runs` ADD COLUMN `runEnd` TEXT")
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `backup_runs` ADD COLUMN `batteryDropPercent` INTEGER")
+            }
+        }
+
         fun get(context: Context): PhotosDatabase {
             instance?.let { return it }
             return synchronized(this) {
@@ -51,7 +63,7 @@ abstract class PhotosDatabase : RoomDatabase() {
                     context.applicationContext,
                     PhotosDatabase::class.java,
                     "photos.db",
-                ).addMigrations(MIGRATION_1_2)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { instance = it }
             }

@@ -32,7 +32,7 @@ class RunPaceTest {
     @Test
     fun beforeAnythingIsCopied_saysItIsCheckingWhatIsAlreadyOnTheDrive() {
         assertEquals(
-            "Running for 12 min · checking photos already on your drive",
+            "12 min so far · checking photos already on your drive",
             runPaceLine(running(), start + 12 * minute),
         )
     }
@@ -47,7 +47,7 @@ class RunPaceTest {
             toCopy = 1_300_000_000L,
         )
         assertEquals(
-            "Running for 14 min · about 20 min left",
+            "14 min so far · about 20 min left",
             runPaceLine(state, start + 14 * minute),
         )
     }
@@ -61,7 +61,7 @@ class RunPaceTest {
             toCopy = 1_000_000_000L,
         )
         assertEquals(
-            "Running for 10 min · working out the time left",
+            "10 min so far · working out the time left",
             runPaceLine(state, start + 10 * minute + 30_000L),
         )
     }
@@ -75,7 +75,7 @@ class RunPaceTest {
             toCopy = 500_000_000L,
         )
         assertEquals(
-            "Running for 20 min · finishing up",
+            "20 min so far · finishing up",
             runPaceLine(state, start + 20 * minute),
         )
     }

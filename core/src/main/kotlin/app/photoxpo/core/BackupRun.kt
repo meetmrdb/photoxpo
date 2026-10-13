@@ -49,6 +49,10 @@ data class BackupRunResult(
     val manifestPath: String,
     val items: List<BackupItemOutcome>,
     val status: BackupRunStatus = BackupRunStatus.Completed,
+    /** Why the run ended before every Original was Backed up; null when nothing was left behind. */
+    val stopReason: StopReason? = null,
+    /** How many Originals still need copying when the run stopped for [stopReason]. */
+    val filesLeft: Int = 0,
 )
 
 class BackupRunner(
@@ -60,9 +64,17 @@ class BackupRunner(
     private val backedUpLedger: BackedUpLedger = InMemoryBackedUpLedger(),
     private val previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     private val newDriveId: () -> String = { UUID.randomUUID().toString() },
-    private val fileCap: Int? = null,
+    private val stopPolicy: StopPolicy = DefaultStopPolicy(),
+    private val batteryInput: BatteryInput = BatteryInput { null },
     private val previewPreset: PreviewPreset? = null,
     private val isCancelled: () -> Boolean = { false },
+    /**
+     * A stop asked for from outside the run, for example Android's time limit on the foreground service.
+     * Null means keep going. Checked before each new copy like the [stopPolicy], so the current Original
+     * always finishes and the run ends as a normal stop with files left.
+     */
+    private val externalStop: () -> StopReason? = { null },
+    private val checkPolicy: CheckPolicy = CheckPolicy.skipRecentlyChecked(),
 ) {
     fun start(): BackupRunResult {
         val startedAt = clock.instant()
@@ -106,7 +118,10 @@ class BackupRunner(
                 committed = committed,
                 manifest = manifest,
             )
-            var copies = 0
+            // The first reading the run takes, before it copies anything; the drop is measured from here.
+            var batteryAtStart: BatteryStatus? = null
+            var copiedBytes = 0L
+            var stopReason: StopReason? = null
             var committedCount = 0
             var committedBytes = 0L
             for (file in files) {
@@ -120,33 +135,75 @@ class BackupRunner(
                         manifestHasNoFileLine = linesByHash.isEmpty(),
                     )
                 }
-                val allowNewCopy = fileCap == null || copies < fileCap
-                val copied = copier.copy(file, allowNewCopy)
-                if (copied.deferredByCap) {
+                if (checkedRecentlyAndStillOnDrive(file, committed)) {
+                    items += BackupItemOutcome(file.id, file.name, ItemState.COMMITTED)
+                    continue
+                }
+                // Once the run decides to stop, it only finishes Originals that need no new copy.
+                val reasonNow = stopReason ?: externalStop() ?: run {
+                    val battery = batteryInput.read()
+                    if (batteryAtStart == null) batteryAtStart = battery
+                    stopPolicy.reasonToStop(
+                        RunProgress(
+                            copiedBytes = copiedBytes,
+                            elapsed = Duration.between(startedAt, clock.instant()),
+                            nextFileBytes = file.sizeBytes,
+                            batteryPercent = battery?.percent,
+                            charging = battery?.charging ?: false,
+                        ),
+                    )
+                }
+                val copied = try {
+                    copier.copy(file, allowNewCopy = reasonNow == null)
+                } catch (_: DriveFullException) {
+                    // Same stop path as the limits: this Original and the rest wait for the next run.
+                    stopReason = StopReason.DriveFull
+                    deferred += file.id
+                    continue
+                }
+                if (copied.deferredByStop) {
+                    stopReason = reasonNow
                     deferred += file.id
                     continue
                 }
                 if (copied.hash != null && copied.outcome.state == ItemState.COMMITTED) {
-                    backedUpLedger.record(file.id, copied.hash)
+                    backedUpLedger.recordChecked(file, copied.hash, clock.instant())
                 }
                 if (copied.wroteNewFileLine) {
                     committedCount += 1
                     committedBytes += file.sizeBytes
                 }
                 if (copied.copiedFile) {
-                    copies += 1
+                    copiedBytes += file.sizeBytes
                 }
                 items += copied.outcome
             }
             val endedAt = clock.instant()
             archiveDrive.appendText(
                 manifestPath,
-                footerLine(startedAt, endedAt, committedCount, committedBytes) + "\n",
+                footerLine(
+                    startedAt, endedAt, committedCount, committedBytes, stopReason,
+                    batteryDropPercent(batteryAtStart, batteryInput.read()),
+                ) + "\n",
             )
-            return BackupRunResult(manifestPath, items, BackupRunStatus.Completed)
+            return BackupRunResult(
+                manifestPath = manifestPath,
+                items = items,
+                status = BackupRunStatus.Completed,
+                stopReason = stopReason,
+                filesLeft = deferred.size,
+            )
         } catch (_: DriveUnavailableException) {
             return pausedResult(manifestPath, files, items, deferred)
         }
+    }
+
+    private fun checkedRecentlyAndStillOnDrive(file: MediaFile, committed: List<ManifestFileEntry>): Boolean {
+        val record = backedUpLedger.checkedOriginal(file.id)
+        if (!checkPolicy.isRecentlyChecked(record, file, clock.instant())) return false
+        // The Archive Drive is the record: the Manifest must still list it and the file must still be there.
+        val entry = committed.firstOrNull { it.hash == record?.hash } ?: return false
+        return archiveDrive.exists(entry.drivePath) && archiveDrive.byteCount(entry.drivePath) == file.sizeBytes
     }
 
     private fun cancelBetweenFiles(
@@ -244,7 +301,8 @@ fun startBackupRun(
     backedUpLedger: BackedUpLedger = InMemoryBackedUpLedger(),
     previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     newDriveId: () -> String = { UUID.randomUUID().toString() },
-    fileCap: Int? = null,
+    stopPolicy: StopPolicy = DefaultStopPolicy(),
+    batteryInput: BatteryInput = BatteryInput { null },
     previewPreset: PreviewPreset? = null,
 ): BackupRunResult {
     return BackupRunner(
@@ -256,7 +314,8 @@ fun startBackupRun(
         backedUpLedger = backedUpLedger,
         previews = previews,
         newDriveId = newDriveId,
-        fileCap = fileCap,
+        stopPolicy = stopPolicy,
+        batteryInput = batteryInput,
         previewPreset = previewPreset,
     ).start()
 }
@@ -306,6 +365,8 @@ private fun footerLine(
     endedAt: Instant,
     fileCount: Int,
     bytes: Long,
+    stopReason: StopReason?,
+    batteryDropPercent: Int?,
 ): String {
     val elapsedMs = Duration.between(startedAt, endedAt).toMillis().coerceAtLeast(0)
     val mbPerSecond = if (elapsedMs == 0L) {
@@ -313,7 +374,7 @@ private fun footerLine(
     } else {
         (bytes.toDouble() / 1_000_000.0) / (elapsedMs.toDouble() / 1000.0)
     }
-    return JsonLine()
+    val line = JsonLine()
         .field("type", "footer")
         .field("startedAt", ISO_MILLIS.format(startedAt))
         .field("endedAt", ISO_MILLIS.format(endedAt))
@@ -322,7 +383,15 @@ private fun footerLine(
         .field("checked", true)
         .field("elapsedMs", elapsedMs)
         .field("mbPerSecond", mbPerSecond)
-        .build()
+        .field("stopReason", (stopReason?.let { RunEnd.Stopped(it) } ?: RunEnd.Finished).wire)
+    // Only when it can be trusted: a charging phone or an unknown level says nothing about battery use.
+    if (batteryDropPercent != null) line.field("batteryDropPercent", batteryDropPercent.toLong())
+    return line.build()
+}
+
+private fun batteryDropPercent(start: BatteryStatus?, end: BatteryStatus?): Int? {
+    if (start == null || end == null || start.charging || end.charging) return null
+    return (start.percent - end.percent).coerceAtLeast(0)
 }
 
 internal fun MediaKind.wireName(): String = when (this) {

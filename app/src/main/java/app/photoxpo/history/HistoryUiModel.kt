@@ -4,6 +4,7 @@ import app.photoxpo.formatByteCount
 import app.photoxpo.core.BackupRunSummary
 import app.photoxpo.core.byBackup
 import app.photoxpo.core.byMonth
+import app.photoxpo.core.runEndWords
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
@@ -22,6 +23,7 @@ data class HistoryBackupRow(
     val sizeLabel: String,
     val speedLabel: String?,
     val stoppedEarlyLabel: String?,
+    val endReasonLabel: String? = null,
     val checked: Boolean = false,
 )
 
@@ -82,6 +84,7 @@ private fun backupRow(summary: BackupRunSummary, zone: ZoneId, locale: Locale): 
         sizeLabel = sizeLabel(summary.bytes),
         speedLabel = if (summary.interrupted) null else speedLabel(summary.mbPerSecond),
         stoppedEarlyLabel = if (summary.interrupted) "Stopped early" else null,
+        endReasonLabel = summary.runEnd?.let(::runEndWords),
         checked = summary.checked && !summary.interrupted,
     )
 }

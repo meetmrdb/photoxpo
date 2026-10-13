@@ -211,6 +211,13 @@ fun HomeScreen(
                     tone = ChipTone.Warn,
                 )
             }
+            model.longRunWarning?.let { warning ->
+                StatusChip(
+                    label = warning,
+                    icon = painterResource(R.drawable.ic_warning),
+                    tone = ChipTone.Warn,
+                )
+            }
             if (model.allBackedUp) {
                 // Nothing to start until a new photo shows up.
             } else if (model.primaryPauses) {
@@ -408,7 +415,6 @@ private fun previewOffline(): HomeUiModel {
             totalCount = 1346,
             lastBackedUpAtEpochMillis = 1_000L,
             driveStatus = DriveStatus.Absent,
-            fileCap = 200,
         ),
         nowEpochMillis = 1_000L + 3 * 60 * 60 * 1000L,
     )
@@ -422,7 +428,6 @@ private fun previewRunning(): HomeUiModel {
             totalCount = 200,
             lastBackedUpAtEpochMillis = 5_000L,
             driveStatus = DriveStatus.Ready,
-            fileCap = 200,
         ),
         nowEpochMillis = 5_000L + 60_000L,
     )

@@ -3,8 +3,11 @@ package app.photoxpo.backup
 import android.content.Context
 import android.net.Uri
 import app.photoxpo.core.BackedUpLedger
+import app.photoxpo.core.CheckedOriginal
 import app.photoxpo.core.DriveIdentityStore
+import app.photoxpo.core.MediaFile
 import app.photoxpo.core.PreviewPreset
+import java.time.Instant
 
 /** When the phone last read Backup history from the Archive Drive. */
 interface LastArchiveDriveConnection {
@@ -16,23 +19,14 @@ interface LastArchiveDriveConnection {
 /**
  * Phone-side memory for the Archive Drive: expected drive id, Backed up hashes,
  * last Backed up time, the last time the Archive Drive was connected, chosen tree,
- * file cap, onboarding, and Preview preset.
+ * onboarding, and Preview preset.
  */
 class BackupSettingsStore(
     context: Context,
 ) : DriveIdentityStore, BackedUpLedger, LastArchiveDriveConnection {
     private val settings = context.applicationContext.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
     private val ledger = context.applicationContext.getSharedPreferences(LEDGER_PREFS, Context.MODE_PRIVATE)
-
-    fun fileCap(): Int {
-        val stored = settings.getInt(KEY_FILE_CAP, DEFAULT_FILE_CAP)
-        return if (stored < 1) DEFAULT_FILE_CAP else stored
-    }
-
-    fun setFileCap(fileCap: Int) {
-        val stored = if (fileCap < 1) DEFAULT_FILE_CAP else fileCap
-        settings.edit().putInt(KEY_FILE_CAP, stored).commit()
-    }
+    private val checks = context.applicationContext.getSharedPreferences(CHECKS_PREFS, Context.MODE_PRIVATE)
 
     fun onboardingDone(): Boolean = settings.getBoolean(KEY_ONBOARDING_DONE, false)
 
@@ -93,6 +87,25 @@ class BackupSettingsStore(
         ledger.edit().putString(mediaId, hash).commit()
     }
 
+    override fun recordChecked(file: MediaFile, hash: String, checkedAt: Instant) {
+        record(file.id, hash)
+        checks.edit()
+            .putString(file.id, "$hash|${file.sizeBytes}|${file.modifiedAtEpochMillis}|${checkedAt.toEpochMilli()}")
+            .commit()
+    }
+
+    /** Older records have a hash but no check time; they come back with a null [CheckedOriginal.checkedAt]. */
+    override fun checkedOriginal(mediaId: String): CheckedOriginal? {
+        val hash = ledger.getString(mediaId, null) ?: return null
+        val parts = checks.getString(mediaId, null)?.split('|')
+        if (parts == null || parts.size != 4 || parts[0] != hash) return CheckedOriginal.unknown(hash)
+        val size = parts[1].toLongOrNull()
+        val modified = parts[2].toLongOrNull()
+        val checkedAt = parts[3].toLongOrNull()
+        if (size == null || modified == null || checkedAt == null) return CheckedOriginal.unknown(hash)
+        return CheckedOriginal(hash, size, modified, Instant.ofEpochMilli(checkedAt))
+    }
+
     fun hasRecorded(mediaId: String): Boolean = ledger.contains(mediaId)
 
     /**
@@ -107,6 +120,7 @@ class BackupSettingsStore(
 
     override fun clear() {
         ledger.edit().clear().commit()
+        checks.edit().clear().commit()
     }
 
     /** Backed up Originals this phone knows about: MediaStore id to SHA-256. The drive wins; this is a cache. */
@@ -117,11 +131,11 @@ class BackupSettingsStore(
     private companion object {
         const val SETTINGS_PREFS = "photoxpo.backup"
         const val LEDGER_PREFS = "photoxpo.backed-up"
+        const val CHECKS_PREFS = "photoxpo.checked-at"
         const val KEY_LAST_BACKED_UP_AT = "lastBackedUpAtEpochMillis"
         const val KEY_LAST_CONNECTED_AT = "lastConnectedAtEpochMillis"
         const val KEY_DRIVE_ID = "expectedDriveId"
         const val KEY_TREE_URI = "treeUri"
-        const val KEY_FILE_CAP = "fileCap"
         const val KEY_ONBOARDING_DONE = "onboardingDone"
         const val KEY_RUN_ACTIVE = "runActive"
         const val KEY_PREVIEW_PRESET = "previewPreset"

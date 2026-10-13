@@ -14,7 +14,12 @@ import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.BackupRunner
 import app.photoxpo.core.DriveFullException
 import app.photoxpo.core.BackedUpLedger
+import app.photoxpo.core.MediaFile
 import app.photoxpo.core.ItemState
+import app.photoxpo.core.RecentRun
+import app.photoxpo.core.StopReason
+import app.photoxpo.core.byBackup
+import java.time.Duration
 import app.photoxpo.PhotoxpoApp
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.data.MediaStoreSource
@@ -38,6 +43,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,6 +62,7 @@ class BackupController private constructor(
     private val runGate = Any()
     private val cancel = AtomicBoolean(false)
     private val userStop = AtomicBoolean(false)
+    private val timeLimitStop = AtomicBoolean(false)
     private val libraryRefreshing = AtomicBoolean(false)
     private val pauseReason = AtomicReference(PauseReason.User)
     private val wakeLockGate = Any()
@@ -71,7 +79,6 @@ class BackupController private constructor(
             // The phone's cache of Backed up Originals survives a restart; the drive stays the truth.
             backedUpCount = settings.ledgerEntries().size,
             lastBackedUpAtEpochMillis = settings.lastBackedUpAtEpochMillis(),
-            fileCap = settings.fileCap(),
         ),
     )
     val state: StateFlow<BackupUiState> = _state.asStateFlow()
@@ -89,19 +96,15 @@ class BackupController private constructor(
         )
     }
 
-    fun start(fileCap: Int = settings.fileCap()) {
-        val cap = if (fileCap < 1) DEFAULT_FILE_CAP else fileCap
-        settings.setFileCap(cap)
-        if (runJob?.isActive == true) {
-            _state.update { it.copy(fileCap = cap) }
-            return
-        }
+    fun start() {
+        if (runJob?.isActive == true) return
         userStop.set(false)
+        timeLimitStop.set(false)
         cancel.set(false)
         pauseReason.set(PauseReason.User)
         val blocked = currentSessionAccess()
         if (blocked != null) {
-            refuseSessionAccess(blocked, cap)
+            refuseSessionAccess(blocked)
             return
         }
         val uri = settings.treeUri()
@@ -109,7 +112,6 @@ class BackupController private constructor(
             _state.update {
                 it.copy(
                     status = BackupStatus.Idle,
-                    fileCap = cap,
                     driveStatus = DriveStatus.Absent,
                     message = MESSAGE_CHOOSE_DRIVE,
                     sessionAccess = null,
@@ -123,7 +125,6 @@ class BackupController private constructor(
                 it.copy(
                     status = BackupStatus.Paused(PauseReason.DriveOut),
                     driveStatus = drive,
-                    fileCap = cap,
                     message = MESSAGE_DRIVE_OUT,
                     sessionAccess = null,
                 )
@@ -131,7 +132,7 @@ class BackupController private constructor(
             return
         }
         _state.update {
-            it.runStarted(totalCount = it.totalCount, fileCap = cap, driveStatus = drive)
+            it.runStarted(totalCount = it.totalCount, driveStatus = drive)
                 .copy(sessionAccess = null, backedUpCount = it.backedUpCount)
         }
         try {
@@ -163,19 +164,41 @@ class BackupController private constructor(
         }
     }
 
+    /**
+     * Android's time limit on the foreground service: ask the run to end cleanly. The run finishes the
+     * Original it is copying, then stops with [StopReason.TimeLimit] and the files left, like any other stop.
+     */
+    internal fun requestTimeLimitStop() {
+        timeLimitStop.set(true)
+    }
+
+    /**
+     * Waits up to [timeoutMs] for the copying to stop after [requestTimeLimitStop]. If the current Original
+     * is not finished in time, pauses between Originals instead, so the service can always stop promptly.
+     * Returns true when the run ended cleanly as a time-limit stop.
+     */
+    internal suspend fun awaitTimeLimitStop(timeoutMs: Long): Boolean {
+        val ended = withTimeoutOrNull(timeoutMs) {
+            _state.first { it.status != BackupStatus.Running }
+            true
+        } ?: false
+        if (!ended) pause()
+        return ended
+    }
+
     internal fun beginRun() {
         synchronized(runGate) {
             if (userStop.get()) return
             if (runJob?.isActive == true) return
             val blocked = currentSessionAccess()
             if (blocked != null) {
-                refuseSessionAccess(blocked, settings.fileCap())
+                refuseSessionAccess(blocked)
                 stopService()
                 return
             }
             val uri = settings.treeUri() ?: return
             cancel.set(false)
-            val cap = settings.fileCap()
+            timeLimitStop.set(false)
             runJob = scope.launch {
                 settings.setRunActive(true)
                 // Free space on the drive shifts as files land; keep Home's number fresh during a long run.
@@ -187,7 +210,7 @@ class BackupController private constructor(
                     }
                 }
                 try {
-                    executeRun(uri, cap)
+                    executeRun(uri)
                 } finally {
                     spaceTicker.cancel()
                     settings.setRunActive(false)
@@ -280,7 +303,7 @@ class BackupController private constructor(
         _state.update { it.copy(message = MESSAGE_CONNECTED_DEVICE_FALLBACK) }
     }
 
-    private suspend fun executeRun(uri: Uri, cap: Int) {
+    private suspend fun executeRun(uri: Uri) {
         if (shouldAbandon()) {
             finishAbandoned()
             return
@@ -306,7 +329,6 @@ class BackupController private constructor(
         _state.update {
             it.runStarted(
                 totalCount = total,
-                fileCap = cap,
                 driveStatus = it.driveStatus,
                 bytesToCopy = bytesToCopy,
             ).copy(backedUpCount = alreadyBackedUp)
@@ -320,9 +342,10 @@ class BackupController private constructor(
                         archiveDrive = SafArchiveDrive(appContext, uri),
                         driveIdentity = settings,
                         backedUpLedger = progressLedger(recorded, sizeById),
-                        fileCap = cap,
                         previewPreset = settings.previewPreset(),
                         isCancelled = { cancel.get() },
+                        externalStop = { if (timeLimitStop.get()) StopReason.TimeLimit else null },
+                        batteryInput = AndroidBatteryInput(appContext),
                     ).start()
                     RunOutcome(result, probeOrAbsent(uri))
                 } finally {
@@ -483,19 +506,30 @@ class BackupController private constructor(
     }
 
     private fun progressLedger(recorded: AtomicInteger, sizeById: Map<String, Long> = emptyMap()): BackedUpLedger {
+        // A run walks every photo again and re-confirms the old ones. Only a new one adds to the count.
+        fun countIfNew(mediaId: String, isNew: Boolean) {
+            if (!isNew) return
+            val size = sizeById[mediaId] ?: 0L
+            _state.update {
+                it.withBackedUpCount(recorded.incrementAndGet())
+                    .withCopied(size, System.currentTimeMillis())
+            }
+        }
         return object : BackedUpLedger {
             override fun record(mediaId: String, hash: String) {
-                // A run walks every photo again and re-confirms the old ones. Only a new one adds to the count.
                 val isNew = !settings.hasRecorded(mediaId)
                 settings.record(mediaId, hash)
-                if (isNew) {
-                    val size = sizeById[mediaId] ?: 0L
-                    _state.update {
-                        it.withBackedUpCount(recorded.incrementAndGet())
-                            .withCopied(size, System.currentTimeMillis())
-                    }
-                }
+                countIfNew(mediaId, isNew)
             }
+
+            override fun recordChecked(file: MediaFile, hash: String, checkedAt: java.time.Instant) {
+                val isNew = !settings.hasRecorded(file.id)
+                // recordChecked writes the ledger entry too, so this is one write.
+                settings.recordChecked(file, hash, checkedAt)
+                countIfNew(file.id, isNew)
+            }
+
+            override fun checkedOriginal(mediaId: String) = settings.checkedOriginal(mediaId)
 
             override fun clear() {
                 settings.clear()
@@ -518,7 +552,7 @@ class BackupController private constructor(
         return appContext.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun refuseSessionAccess(access: SessionAccess, fileCap: Int) {
+    private fun refuseSessionAccess(access: SessionAccess) {
         _state.update {
             val status = when (it.status) {
                 BackupStatus.NeedsAttention -> BackupStatus.NeedsAttention
@@ -526,7 +560,6 @@ class BackupController private constructor(
             }
             it.copy(
                 status = status,
-                fileCap = fileCap,
                 sessionAccess = access,
                 message = sessionAccessMessage(access),
             )
@@ -542,12 +575,38 @@ class BackupController private constructor(
                 val ledger = settings.ledgerEntries().keys
                 val left = MediaStoreSource(appContext).listCameraFolder()
                     .filter { it.id !in ledger }
+                val battery = AndroidBatteryInput(appContext).read()
                 _state.update {
-                    it.copy(driveFreeBytes = free, bytesToCopy = left.sumOf { f -> f.sizeBytes }, filesToCopy = left.size)
+                    it.copy(
+                        driveFreeBytes = free,
+                        bytesToCopy = left.sumOf { f -> f.sizeBytes },
+                        filesToCopy = left.size,
+                        batteryPercent = battery?.percent,
+                        charging = battery?.charging ?: false,
+                    )
                 }
+                // Not during a run: its run file has no footer yet and would be read again every tick.
+                if (_state.value.status != BackupStatus.Running) refreshRecentRuns(uri)
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
             }
+        }
+    }
+
+    /** Reads new run files from the Archive Drive and keeps the latest few for Home's time and battery estimate. */
+    private suspend fun refreshRecentRuns(uri: Uri) {
+        try {
+            val all = BackupHistoryRepository(
+                dao = PhotosDatabase.get(appContext).backupRunDao(),
+                settings = settings,
+            ).refresh(SafArchiveDrive(appContext, uri))
+            val recent = byBackup(all.filter { !it.interrupted })
+                .take(RECENT_RUNS_KEPT)
+                .map { RecentRun(it.bytes, it.batteryDropPercent, it.elapsedMs?.let(Duration::ofMillis)) }
+            _state.update { it.copy(recentRuns = recent) }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            // No history just means the cautious fallback estimate.
         }
     }
 
@@ -610,6 +669,7 @@ class BackupController private constructor(
 
     companion object {
         private const val SPACE_REFRESH_MS = 120_000L
+        private const val RECENT_RUNS_KEPT = 5
         private const val DRIVE_GONE_PROBES = 8
         private const val DRIVE_GONE_PROBE_GAP_MS = 750L
         private const val WAKE_LOCK_TAG = "app.photoxpo:backup-run"

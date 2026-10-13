@@ -3,16 +3,16 @@ package app.photoxpo.backup
 import app.photoxpo.core.BackupRunResult
 import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.ItemState
+import app.photoxpo.core.RecentRun
+import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.onboarding.MediaAccessState
 import app.photoxpo.onboarding.accessWarning
 import app.photoxpo.onboarding.classifyMediaAccess
 
-const val DEFAULT_FILE_CAP = 200
-
 const val MESSAGE_DRIVE_OUT = "Archive Drive disconnected."
 
-const val MESSAGE_PAUSED_USER = "Backup run paused."
+const val MESSAGE_PAUSED_USER = "Backup paused."
 
 const val MESSAGE_DRIVE_MISMATCH = "This Archive Drive is not the one this phone remembers."
 
@@ -98,7 +98,9 @@ data class BackupUiState(
     val totalCount: Int = 0,
     val lastBackedUpAtEpochMillis: Long? = null,
     val driveStatus: DriveStatus = DriveStatus.Absent,
-    val fileCap: Int = DEFAULT_FILE_CAP,
+    /** Why the last run ended early, and how many Originals it left. A normal result, not an error. */
+    val stopReason: StopReason? = null,
+    val filesLeft: Int = 0,
     val message: String? = null,
     val sessionAccess: SessionAccess? = null,
     val driveFreeBytes: Long? = null,
@@ -112,11 +114,15 @@ data class BackupUiState(
     val firstCopyAtMillis: Long? = null,
     val firstCopyBytes: Long = 0L,
     val lastRunTookMillis: Long? = null,
+    /** The phone's battery as last read; null when unknown. Home uses it for the before-start warning. */
+    val batteryPercent: Int? = null,
+    val charging: Boolean = false,
+    /** Latest finished Backup runs, newest first, so Home can estimate time and battery use. */
+    val recentRuns: List<RecentRun> = emptyList(),
 )
 
 fun BackupUiState.runStarted(
     totalCount: Int,
-    fileCap: Int,
     driveStatus: DriveStatus,
     bytesToCopy: Long = 0L,
     nowEpochMillis: Long = System.currentTimeMillis(),
@@ -126,7 +132,8 @@ fun BackupUiState.runStarted(
         status = BackupStatus.Running,
         backedUpCount = 0,
         totalCount = totalCount,
-        fileCap = fileCap,
+        stopReason = null,
+        filesLeft = 0,
         driveStatus = driveStatus,
         message = kept,
         filesToCopy = null,
@@ -178,7 +185,8 @@ fun reduceBackupRun(
     val status = when (result.status) {
         BackupRunStatus.Paused -> BackupStatus.Paused(pauseReason)
         BackupRunStatus.Completed ->
-            if (needsAttention) BackupStatus.NeedsAttention else BackupStatus.Done
+            if (result.stopReason == StopReason.DriveFull) BackupStatus.DriveFull
+            else if (needsAttention) BackupStatus.NeedsAttention else BackupStatus.Done
         BackupRunStatus.DriveMismatch -> BackupStatus.DriveMismatch
     }
     val message = when {
@@ -199,5 +207,7 @@ fun reduceBackupRun(
         totalCount = total,
         lastBackedUpAtEpochMillis = if (committed > 0) nowEpochMillis else state.lastBackedUpAtEpochMillis,
         message = message,
+        stopReason = result.stopReason,
+        filesLeft = result.filesLeft,
     )
 }

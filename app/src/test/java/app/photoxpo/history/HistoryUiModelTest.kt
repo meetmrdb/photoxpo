@@ -1,6 +1,8 @@
 package app.photoxpo.history
 
 import app.photoxpo.core.BackupRunSummary
+import app.photoxpo.core.RunEnd
+import app.photoxpo.core.StopReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -23,6 +25,25 @@ class HistoryUiModelTest {
         assertEquals("11 Oct 2026, 6:30 pm", row.dateLabel)
         assertEquals("1 file", row.filesLabel)
         assertEquals("1 byte", row.sizeLabel)
+    }
+
+    @Test
+    fun row_saysInPlainWordsHowTheRunEnded_andOlderRunsShowNoReason() {
+        val model = historyUiModel(
+            summaries = listOf(
+                run(runFile = "a.jsonl", startedAt = "2026-10-11T18:30:00.000Z", runEnd = RunEnd.Stopped(StopReason.SizeLimit)),
+                run(runFile = "b.jsonl", startedAt = "2026-10-10T18:30:00.000Z", runEnd = RunEnd.Finished),
+                run(runFile = "c.jsonl", startedAt = "2026-10-09T18:30:00.000Z", runEnd = null),
+            ),
+            grouping = HistoryGrouping.ByBackup,
+            driveAttached = true,
+            lastConnectedAtEpochMillis = null,
+            zone = ZoneOffset.UTC,
+        )
+        assertEquals(
+            listOf("Stopped at the size limit", "Finished: everything new was backed up", null),
+            model.rows.map { it.endReasonLabel },
+        )
     }
 
     @Test
@@ -177,6 +198,7 @@ class HistoryUiModelTest {
         bytes: Long = 5,
         mbPerSecond: Double? = 1.25,
         interrupted: Boolean = false,
+        runEnd: RunEnd? = null,
     ): BackupRunSummary {
         return BackupRunSummary(
             runFile = runFile,
@@ -188,6 +210,7 @@ class HistoryUiModelTest {
             elapsedMs = if (interrupted) null else 120_000,
             mbPerSecond = if (interrupted) null else mbPerSecond,
             interrupted = interrupted,
+            runEnd = runEnd,
         )
     }
 }

@@ -10,6 +10,8 @@ import app.photoxpo.backup.PauseReason
 import app.photoxpo.backup.SessionAccess
 import app.photoxpo.backup.backupProgressText
 import app.photoxpo.backup.sessionAccessMessage
+import app.photoxpo.core.LOW_BATTERY_PERCENT
+import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.onboarding.MediaAccessState
 import app.photoxpo.onboarding.accessWarning
@@ -45,6 +47,7 @@ data class HomeUiModel(
     val driveChipLabel: String = "Drive connected",
     val showProgress: Boolean = false,
     val lastBackedUpDate: String? = null,
+    val longRunWarning: String? = null,
 )
 
 fun homeUiModel(
@@ -55,7 +58,7 @@ fun homeUiModel(
 ): HomeUiModel {
     val lastBackedUpLine = lastBackedUpLine(state.lastBackedUpAtEpochMillis, nowEpochMillis)
     return HomeUiModel(
-        statusSentence = statusSentence(state),
+        statusSentence = statusSentence(state, locale),
         primaryLabel = primaryLabel(state),
         primaryPauses = state.status == BackupStatus.Running,
         progressText = backupProgressText(state),
@@ -72,9 +75,28 @@ fun homeUiModel(
         lastRunLine = lastRunLine(state),
         spaceWarning = spaceWarning(state),
         driveChipLabel = driveChipLabel(state.driveStatus),
-        showProgress = state.status == BackupStatus.Running || state.status is BackupStatus.Paused,
+        showProgress = state.status == BackupStatus.Running ||
+            state.status is BackupStatus.Paused ||
+            stopHeadline(state, locale) != null,
         lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
+        longRunWarning = longRunWarning(state),
     )
+}
+
+/**
+ * A backup that stopped early is normal progress, so it is Home's headline: why, and how many files are left.
+ * Null when nothing was left behind or the stop has no wording of its own here (a full drive has its own status).
+ */
+private fun stopHeadline(state: BackupUiState, locale: Locale): String? {
+    val reason = state.stopReason ?: return null
+    if (state.filesLeft <= 0) return null
+    val count = java.text.NumberFormat.getIntegerInstance(locale).format(state.filesLeft)
+    val left = if (state.filesLeft == 1) "$count file left" else "$count files left"
+    return when (reason) {
+        StopReason.LowBattery -> "Paused at $LOW_BATTERY_PERCENT% battery. $left. Charge, then reconnect your drive."
+        StopReason.SizeLimit, StopReason.TimeLimit -> "Time limit reached. $left."
+        StopReason.DriveFull -> null
+    }
 }
 
 /** Everything in the Camera folder is Backed up, so there is nothing to start until a new photo appears. */
@@ -132,14 +154,14 @@ fun homeAccessWarning(access: SessionAccess?): HomeAccessWarning? {
     )
 }
 
-private fun statusSentence(state: BackupUiState): String {
+private fun statusSentence(state: BackupUiState, locale: Locale): String {
     return when (val status = state.status) {
         BackupStatus.Idle,
         BackupStatus.Done,
-        -> backedUpSentence(state.backedUpCount)
+        -> stopHeadline(state, locale) ?: backedUpSentence(state.backedUpCount)
         BackupStatus.Running -> "Backing up your photos"
         is BackupStatus.Paused -> when (status.reason) {
-            PauseReason.User -> "Backup run paused"
+            PauseReason.User -> "Backup paused"
             PauseReason.DriveOut ->
                 if (state.driveStatus == DriveStatus.Ready) {
                     "Your Archive Drive is back"
@@ -170,16 +192,7 @@ private fun primaryLabel(state: BackupUiState): String {
     if (status is BackupStatus.Paused && status.reason == PauseReason.DriveOut && state.driveStatus == DriveStatus.Ready) {
         return "Continue backing up"
     }
-    return startLabel(state.fileCap, more)
-}
-
-private fun startLabel(fileCap: Int, more: Boolean): String {
-    val files = if (fileCap == 1) "file" else "files"
-    return if (more) {
-        "Back up $fileCap more $files"
-    } else {
-        "Back up $fileCap $files"
-    }
+    return if (more) "Back up more" else "Back up"
 }
 
 private fun progressFraction(state: BackupUiState): Float? {

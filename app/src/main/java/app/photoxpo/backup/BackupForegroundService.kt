@@ -61,12 +61,12 @@ class BackupForegroundService : Service() {
     }
 
     override fun onTimeout(startId: Int) {
-        pauseFromTimeout(startId)
+        stopFromTimeout(startId)
     }
 
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
     override fun onTimeout(startId: Int, fgsType: Int) {
-        pauseFromTimeout(startId)
+        stopFromTimeout(startId)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -81,11 +81,22 @@ class BackupForegroundService : Service() {
         super.onDestroy()
     }
 
-    private fun pauseFromTimeout(startId: Int) {
-        BackupController.get(this).pause()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        promoted = false
-        stopSelf(startId)
+    /**
+     * Android's time limit. Ask the run to end cleanly after the current Original (a normal time-limit
+     * stop, with files left, recorded in history), but never wait long: Android wants the service to stop
+     * within a few seconds, so after [TIMEOUT_WAIT_MS] the run pauses between Originals instead.
+     */
+    private fun stopFromTimeout(startId: Int) {
+        val controller = BackupController.get(this)
+        controller.requestTimeLimitStop()
+        scope.launch {
+            controller.awaitTimeLimitStop(TIMEOUT_WAIT_MS)
+            if (promoted) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                promoted = false
+            }
+            stopSelf(startId)
+        }
     }
 
     private fun ensureForeground() {
@@ -233,5 +244,8 @@ class BackupForegroundService : Service() {
 
         private const val CHANNEL_ID = "backup-run"
         private const val NOTIFICATION_ID = 29
+
+        /** Android gives a timed-out foreground service only a few seconds before it is treated as stuck. */
+        private const val TIMEOUT_WAIT_MS = 4_000L
     }
 }

@@ -1,5 +1,7 @@
 package app.photoxpo.core
 
+import java.time.Instant
+
 internal const val DRIVE_ID_PATH = "Photoxpo/.photoxpo/drive-id"
 
 /**
@@ -18,6 +20,15 @@ interface DriveIdentityStore {
  */
 interface BackedUpLedger {
     fun record(mediaId: String, hash: String)
+
+    /**
+     * Records that [file] was copied and checked identical at [checkedAt].
+     * Ledgers that cannot keep a check time fall back to [record]; the Original then counts as not checked recently.
+     */
+    fun recordChecked(file: MediaFile, hash: String, checkedAt: Instant) = record(file.id, hash)
+
+    /** When [mediaId] was last checked, or null when unknown. A record with a null check time is "not checked recently". */
+    fun checkedOriginal(mediaId: String): CheckedOriginal? = null
 
     fun clear()
 }
@@ -46,13 +57,26 @@ class InMemoryDriveIdentityStore(
 
 class InMemoryBackedUpLedger : BackedUpLedger {
     private val stored = linkedMapOf<String, String>()
+    private val checks = mutableMapOf<String, CheckedOriginal>()
 
     override fun record(mediaId: String, hash: String) {
         stored[mediaId] = hash
+        if (checks[mediaId]?.hash != hash) checks.remove(mediaId)
+    }
+
+    override fun recordChecked(file: MediaFile, hash: String, checkedAt: Instant) {
+        stored[file.id] = hash
+        checks[file.id] = CheckedOriginal(hash, file.sizeBytes, file.modifiedAtEpochMillis, checkedAt)
+    }
+
+    override fun checkedOriginal(mediaId: String): CheckedOriginal? {
+        val hash = stored[mediaId] ?: return null
+        return checks[mediaId] ?: CheckedOriginal.unknown(hash)
     }
 
     override fun clear() {
         stored.clear()
+        checks.clear()
     }
 
     fun hashes(): Map<String, String> = stored.toMap()
