@@ -131,7 +131,7 @@ class HistoryUiModelTest {
         )
         assertTrue(model.rows.isEmpty())
         assertEquals(listOf("October 2026", "September 2026"), model.sections.map { it.monthLabel })
-        assertEquals("3 files, 55 bytes", model.sections[0].totalsLabel)
+        assertEquals("3 files · 55 bytes", model.sections[0].totalsLabel)
         assertEquals(
             listOf("20261011T230000000Z.jsonl", "20261001T080000000Z.jsonl"),
             model.sections[0].rows.map { it.runFile },
@@ -140,7 +140,7 @@ class HistoryUiModelTest {
         assertNull(model.sections[0].rows[0].stoppedEarlyLabel)
         assertEquals("Stopped early", model.sections[0].rows[1].stoppedEarlyLabel)
         assertNull(model.sections[0].rows[1].speedLabel)
-        assertEquals("1 file, 10 bytes", model.sections[1].totalsLabel)
+        assertEquals("1 file · 10 bytes", model.sections[1].totalsLabel)
     }
 
     @Test
@@ -164,6 +164,98 @@ class HistoryUiModelTest {
         )
         assertEquals("Stopped early", model.rows[1].stoppedEarlyLabel)
         assertNull(model.rows[0].stoppedEarlyLabel)
+    }
+
+    @Test
+    fun row_isTwoLinesAndOneStatusWord_withTheDetailOneTapAway() {
+        val model = historyUiModel(
+            summaries = listOf(
+                run(
+                    startedAt = "2026-10-13T14:05:00.000Z",
+                    fileCount = 4,
+                    bytes = 10L * 1024 * 1024,
+                    mbPerSecond = 2.5,
+                    runEnd = RunEnd.Finished,
+                ),
+            ),
+            grouping = HistoryGrouping.ByBackup,
+            driveAttached = true,
+            lastConnectedAtEpochMillis = null,
+            zone = ZoneOffset.UTC,
+        )
+        val row = model.rows.single()
+        assertEquals("13 Oct, 2:05 pm", row.shortDateLabel)
+        assertEquals("4 files · 10 MB", row.summaryLabel)
+        assertEquals("Checked", row.statusLabel)
+        assertEquals("Finished: everything new was backed up · 2.5 MB/s", row.detailLabel)
+    }
+
+    @Test
+    fun row_withoutAReasonOrSpeed_hasNoDetail_andAnInterruptedRunSaysStoppedEarly() {
+        val model = historyUiModel(
+            summaries = listOf(
+                run(runFile = "a.jsonl", startedAt = "2026-10-11T18:30:00.000Z", mbPerSecond = null),
+                run(runFile = "b.jsonl", startedAt = "2026-10-10T18:30:00.000Z", interrupted = true),
+            ),
+            grouping = HistoryGrouping.ByBackup,
+            driveAttached = true,
+            lastConnectedAtEpochMillis = null,
+            zone = ZoneOffset.UTC,
+        )
+        assertNull(model.rows[0].detailLabel)
+        assertEquals("Stopped early", model.rows[1].statusLabel)
+        assertNull(model.rows[1].detailLabel)
+    }
+
+    @Test
+    fun aRunThatWasNeverChecked_getsNoStatusWord_andIsNotCalledChecked() {
+        val model = historyUiModel(
+            summaries = listOf(run(startedAt = "2026-10-11T18:30:00.000Z", checked = false)),
+            grouping = HistoryGrouping.ByBackup,
+            driveAttached = true,
+            lastConnectedAtEpochMillis = null,
+            zone = ZoneOffset.UTC,
+        )
+        assertNull(model.rows.single().statusLabel)
+        assertEquals("1 Backup run not checked", model.statusLine)
+        assertEquals(false, model.statusOk)
+    }
+
+    @Test
+    fun statusLine_saysInOneSentenceWhetherEverythingIsChecked() {
+        fun line(vararg runs: BackupRunSummary) = historyUiModel(
+            summaries = runs.toList(),
+            grouping = HistoryGrouping.ByMonth,
+            driveAttached = true,
+            lastConnectedAtEpochMillis = null,
+            zone = ZoneOffset.UTC,
+        )
+        val ok = line(run(runFile = "a.jsonl", startedAt = "2026-10-11T18:30:00.000Z"))
+        assertEquals("Everything is Backed up and checked", ok.statusLine)
+        assertEquals(true, ok.statusOk)
+        val one = line(
+            run(runFile = "a.jsonl", startedAt = "2026-10-11T18:30:00.000Z"),
+            run(runFile = "b.jsonl", startedAt = "2026-10-10T18:30:00.000Z", interrupted = true),
+        )
+        assertEquals("1 Backup run stopped early", one.statusLine)
+        assertEquals(false, one.statusOk)
+        val two = line(
+            run(runFile = "a.jsonl", startedAt = "2026-10-11T18:30:00.000Z", interrupted = true),
+            run(runFile = "b.jsonl", startedAt = "2026-10-10T18:30:00.000Z", interrupted = true),
+        )
+        assertEquals("2 Backup runs stopped early", two.statusLine)
+    }
+
+    @Test
+    fun withNoRuns_thereIsNoStatusLine() {
+        val model = historyUiModel(
+            summaries = emptyList(),
+            grouping = HistoryGrouping.ByMonth,
+            driveAttached = true,
+            lastConnectedAtEpochMillis = null,
+            zone = ZoneOffset.UTC,
+        )
+        assertNull(model.statusLine)
     }
 
     private fun sampleRuns(): List<BackupRunSummary> {
@@ -199,6 +291,7 @@ class HistoryUiModelTest {
         mbPerSecond: Double? = 1.25,
         interrupted: Boolean = false,
         runEnd: RunEnd? = null,
+        checked: Boolean = !interrupted,
     ): BackupRunSummary {
         return BackupRunSummary(
             runFile = runFile,
@@ -206,7 +299,7 @@ class HistoryUiModelTest {
             endedAt = if (interrupted) null else startedAt,
             fileCount = fileCount,
             bytes = bytes,
-            checked = !interrupted,
+            checked = checked,
             elapsedMs = if (interrupted) null else 120_000,
             mbPerSecond = if (interrupted) null else mbPerSecond,
             interrupted = interrupted,
