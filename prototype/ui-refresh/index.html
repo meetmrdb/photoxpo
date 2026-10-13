@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photoxpo PROTOTYPE – Home and Photos, now vs proposed</title>
+<!--
+  PROTOTYPE, THROWAWAY. Question: Home and Photos have collected many text lines that read as a stack.
+  Where should each line live, and how far can Instrument Serif (the wordmark's face) travel through
+  the app without hurting readability? Left phone = what the app does today (copied from HomeScreen.kt
+  and HomeUiModel.kt). Right phone = proposal. All photos are drawn placeholders. Nothing here is product code.
+-->
+<style>
+@font-face{font-family:"Instrument Serif";src:url("../../assets/fonts/instrument-serif/InstrumentSerif-Regular.ttf") format("truetype");font-display:swap}
+:root{
+  --p:#0B5C63;--on-p:#fff;--pc:#C4EBEA;--on-pc:#00201F;
+  --sc:#CCE8E5;--on-sc:#05201E;
+  --bg:#F6FAF9;--surf:#EAF1F0;--surf-hi:#DDE7E6;--on:#161D1D;--var:#3F4948;
+  --outline:#6F7978;--outv:#BEC9C8;
+  --warn:#FFDEA1;--on-warn:#3E2D00;
+  --fs:1;
+  --serif:"Instrument Serif",Georgia,serif;
+  --sans:Roboto,"Segoe UI",system-ui,sans-serif;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+body[data-theme=dark]{
+  --p:#7BD5DA;--on-p:#003739;--pc:#004F53;--on-pc:#C4EBEA;
+  --sc:#2F4B49;--on-sc:#CCE8E5;
+  --bg:#0E1514;--surf:#192020;--surf-hi:#252D2D;--on:#DDE4E3;--var:#BEC9C8;
+  --outline:#889392;--outv:#3F4948;
+  --warn:#5A4300;--on-warn:#FFDEA1;
+}
+*{box-sizing:border-box;margin:0}
+body{font:14px/1.4 var(--sans);background:#d5dddc;color:#162020;padding:20px 16px 48px}
+body[data-theme=dark]{background:#0a0f0f;color:#dde4e3}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:3px solid var(--p);outline-offset:2px}
+
+/* ---------- prototype controls (not part of the app) ---------- */
+#bar{max-width:1000px;margin:0 auto 18px;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+#bar h1{font:400 28px/1.1 var(--serif);width:100%}
+#bar .grp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#bar .lab{font-size:12px;opacity:.7;margin-right:2px}
+.chipb{padding:7px 12px;border-radius:999px;border:1px solid #8a9a99;min-height:36px;font-size:13px}
+.chipb[aria-pressed=true]{background:#0B5C63;color:#fff;border-color:#0B5C63}
+body[data-theme=dark] .chipb[aria-pressed=true]{background:#7BD5DA;color:#003739;border-color:#7BD5DA}
+#stage{max-width:1000px;margin:0 auto;display:flex;flex-wrap:wrap;gap:28px;justify-content:center;align-items:flex-start}
+.col{display:flex;flex-direction:column;align-items:center;gap:8px}
+.cap{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;opacity:.75}
+.cap.new{color:#0B5C63;opacity:1}
+body[data-theme=dark] .cap.new{color:#7BD5DA}
+
+/* ---------- phone ---------- */
+.phone{width:372px;height:780px;border-radius:40px;background:#000;padding:9px;box-shadow:0 14px 34px #0004}
+.screen{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;background:var(--bg);color:var(--on);display:flex;flex-direction:column}
+.sb{height:30px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-size:12px;font-weight:500}
+.body{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+.body::-webkit-scrollbar{display:none}
+.nav{flex:none;height:72px;background:var(--surf);display:flex;justify-content:space-around;align-items:center}
+.nav div{display:flex;flex-direction:column;align-items:center;gap:3px;width:96px;font-size:calc(12px*var(--fs));font-weight:500;color:var(--var)}
+.nav .ind{width:60px;height:30px;border-radius:15px;display:grid;place-items:center}
+.nav .on .ind{background:var(--pc);color:var(--on-pc)}
+.nav .on{color:var(--on)}
+svg.i{width:24px;height:24px;fill:currentColor;flex:none}
+
+/* ---------- type steps (sp, scaled) ---------- */
+.t-head{font:400 calc(34px*var(--fs))/1.12 var(--serif);letter-spacing:0;text-wrap:balance}
+.t-head .fig{font:400 calc(30px*var(--fs)) var(--sans)}
+.t-head .fig.med{font-weight:500}
+.t-title2{font:400 calc(26px*var(--fs))/1.15 var(--serif)}
+.t-month{font:400 calc(22px*var(--fs))/1.2 var(--serif)}
+.t-large{font:500 calc(22px*var(--fs))/1.25 var(--sans)}
+.t-title{font:500 calc(16px*var(--fs))/1.4 var(--sans);letter-spacing:.1px}
+.t-body{font:400 calc(16px*var(--fs))/1.45 var(--sans)}
+.t-bodym{font:400 calc(14px*var(--fs))/1.4 var(--sans)}
+.var{color:var(--var)}
+
+/* ---------- shared pieces ---------- */
+.logo{height:40px;display:block}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:6px 14px 6px 12px;border-radius:10px;background:var(--surf);font:500 calc(14px*var(--fs))/1.3 var(--sans)}
+.chip.ok{background:var(--pc);color:var(--on-pc)}
+.chip.warn{background:var(--warn);color:var(--on-warn)}
+.chip svg{width:20px;height:20px}
+.bar{height:8px;border-radius:4px;background:var(--surf-hi);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--p);border-radius:4px}
+.btn{width:100%;min-height:56px;border-radius:28px;background:var(--p);color:var(--on-p);font:500 calc(16px*var(--fs)) var(--sans);display:grid;place-items:center;padding:0 24px}
+.btn.tonal{background:var(--sc);color:var(--on-sc)}
+.btn.off{background:var(--surf-hi);color:var(--var)}
+.txtbtn{min-height:48px;color:var(--p);font:500 calc(16px*var(--fs)) var(--sans);align-self:center;padding:0 16px}
+.rowcard{display:flex;align-items:center;gap:14px;min-height:64px;padding:14px 16px;border-radius:20px;background:var(--surf)}
+.rowcard .tx{flex:1}
+.rowcard svg{color:var(--var)}
+.ico-p{color:var(--p)}
+
+/* ---------- NOW: Home as built ---------- */
+.now-home{display:flex;flex-direction:column;gap:16px;padding:8px 20px 24px}
+.now-home .stack8{display:flex;flex-direction:column;gap:8px}
+.now-head{min-height:64px;display:flex;align-items:center;padding:0 20px}
+
+/* ---------- PROPOSED: Home ---------- */
+.new-home{display:flex;flex-direction:column;padding:0 20px 24px}
+.new-top{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;font:500 calc(14px*var(--fs))/1.2 var(--sans);color:var(--var);white-space:nowrap}
+.pill svg{width:18px;height:18px}
+.pill.ok svg{color:var(--p)}
+.pill.warn{color:var(--on-warn);background:var(--warn);padding:6px 10px;border-radius:10px}
+.hero{display:flex;flex-direction:column;gap:10px;padding:12px 0 20px}
+.sub{display:flex;gap:8px;align-items:flex-start}
+.sub svg{width:22px;height:22px;margin-top:1px;color:var(--p)}
+.state{background:var(--surf);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+.state .row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.state .note{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:14px;background:var(--warn);color:var(--on-warn)}
+.state .note svg{width:20px;height:20px;margin-top:1px}
+.state .foot{padding-top:2px}
+.actions{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}
+.new-home .rowcard{margin-top:0}
+
+/* ---------- Photos ---------- */
+.ph-pad{padding:0 3px}
+.mh{padding:16px 13px 8px;background:var(--bg);position:sticky;top:0;z-index:2}
+.now-mh{font:500 calc(14px*var(--fs))/1.4 var(--sans);color:var(--var)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+.tile{aspect-ratio:1;border-radius:2px;position:relative;overflow:hidden}
+.badge{position:absolute;right:6px;bottom:6px;width:24px;height:24px;border-radius:50%;background:rgba(10,16,16,.62);color:#fff;display:grid;place-items:center}
+.badge svg{width:15px;height:15px}
+.vid{position:absolute;left:6px;bottom:6px;height:22px;border-radius:11px;background:rgba(10,16,16,.62);color:#fff;display:flex;align-items:center;gap:3px;padding:0 8px 0 6px;font:500 11px/1 var(--sans)}
+.vid svg{width:13px;height:13px}
+.seg{display:flex;border:1px solid var(--outline);border-radius:20px;overflow:hidden}
+.seg span{padding:0 14px;display:grid;place-items:center;font:500 calc(14px*var(--fs)) var(--sans)}
+.seg .sel{background:var(--sc);color:var(--on-sc)}
+.now-seg{margin:0 16px 4px}
+.now-seg .seg{height:40px}
+.now-seg .seg span{flex:1}
+.now-pt{min-height:64px;padding:0 20px;display:flex;align-items:center}
+.new-pt{padding:10px 16px 0 20px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.new-pt .seg{height:34px;margin-bottom:6px}
+.strip{display:flex;gap:10px;align-items:center;padding:6px 16px 4px 20px;color:var(--var)}
+.strip .badge{position:static;flex:none}
+.legend{display:flex;gap:10px;align-items:center;padding:16px 13px 24px;color:var(--var)}
+.legend .badge{position:static;flex:none}
+
+
+/* ---------- floating nav (proposed) ---------- */
+.fnav{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;height:64px;padding:0 8px;border-radius:32px;background:var(--surf-hi);border:1px solid var(--outv);display:flex;align-items:center;gap:4px;z-index:5}
+.fnav div{height:48px;min-width:104px;padding:0 18px;border-radius:24px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--var);font:500 calc(14px*var(--fs)) var(--sans)}
+.fnav .on{background:var(--pc);color:var(--on-pc)}
+.fnav svg{width:22px;height:22px}
+.body.float{padding-bottom:96px}
+
+/* ---------- Type map ---------- */
+#typemap{max-width:1000px;margin:36px auto 0;display:none}
+#typemap.show{display:block}
+#typemap h2{font:400 26px/1.15 var(--serif);margin-bottom:6px}
+#typemap p{max-width:62ch;opacity:.85;margin-bottom:16px}
+.tm{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.mini{width:340px;height:520px;border-radius:28px;background:#000;padding:7px}
+.mini .screen{border-radius:22px}
+.rules{max-width:62ch;margin-top:20px;display:grid;gap:6px}
+.rules div{display:flex;gap:10px}
+.rules b{min-width:60px;color:#0B5C63}
+body[data-theme=dark] .rules b{color:#7BD5DA}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:32px}
+.dlg{margin:auto 20px;background:var(--surf-hi);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.dlg .acts{display:flex;justify-content:flex-end;gap:4px}
+.mrow{display:flex;gap:12px;align-items:center;min-height:88px;padding:0 16px;border-radius:20px;background:var(--surf);margin:0 16px 10px}
+.strip4{width:84px;height:48px;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;border-radius:10px;overflow:hidden;flex:none}
+.pillok{color:var(--p);font:500 calc(14px*var(--fs)) var(--sans);display:flex;align-items:center;gap:6px}
+.pillok svg{width:18px;height:18px}
+@media (prefers-reduced-motion:no-preference){.hero,.state{animation:rise .5s var(--ease) both}.state{animation-delay:.05s}}
+@keyframes rise{from{opacity:.001;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body data-theme="light">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-drive" viewBox="0 0 24 24"><path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm2 5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm4.5.25h8v1.5h-8z"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM5 17l3.5-4.5 2.5 3 3.5-4.5L19 17H5z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></symbol>
+  <symbol id="i-photos" viewBox="0 0 24 24"><path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z"/></symbol>
+</svg>
+
+<div id="bar">
+  <h1>Home and Photos: now, and proposed</h1>
+  <div class="grp" id="screens"><span class="lab">Screen</span></div>
+  <div class="grp" id="states"><span class="lab">Home state</span></div>
+  <div class="grp"><span class="lab">View</span>
+    <button class="chipb" id="theme" aria-pressed="false">Dark</button>
+    <button class="chipb" id="large" aria-pressed="false">Large text 130%</button>
+  </div>
+</div>
+
+<div id="stage"></div>
+
+<section id="typemap">
+  <h2>Where the serif travels</h2>
+  <p>Instrument Serif is made for large sizes and has one weight. It carries the app's voice only where text is big, short and not interactive. Everything that is read in a line, tapped, or full of figures stays in the sans.</p>
+  <div class="tm" id="tmgrid"></div>
+  <div class="rules">
+    <div><b>Serif</b><span>20 sp and up: the headline sentence, screen titles, month names, empty-state headline, dialog titles, onboarding headlines.</span></div>
+    <div><b>Sans</b><span>Anything under 20 sp, every button and chip, every paragraph, every date and count (Instrument Serif's flagless 1 reads as a lowercase L).</span></div>
+    <div><b>Never</b><span>Serif on a tappable thing, or serif below 20 sp.</span></div>
+  </div>
+</section>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const ic = (id, cls = "") => `<svg class="i ${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const logo = () => `<img class="logo" alt="Photoxpo" src="../../assets/logo/logo-${document.body.dataset.theme === "dark" ? "light" : "dark"}-full.svg">`;
+
+/* ---------- Home states: the strings are the app's real ones (HomeUiModel.kt, RunPace.kt, LongRunWarning.kt) ---------- */
+const FIG = (s) => s.replace(/[0-9][0-9,]*/g, (m) => `<span class="fig">${m}</span>`);
+const STATES = {
+  allDone: {
+    label: "All Backed up", drive: true, sentence: "502 photos backed up", all: true,
+    sub: "Everything on your phone is safe on your Archive Drive.",
+    last: "Last backed up 6 hours ago", date: "13 Oct 2026, 1:55 pm", took: "Last backup took 38 min", space: "5.7 GB free on your Archive Drive",
+    button: null,
+  },
+  newWaiting: {
+    label: "New photos waiting", drive: true, sentence: "502 photos backed up",
+    newLine: "12 new photos and videos · 1.4 GB to back up",
+    last: "Last backed up yesterday", date: "12 Oct 2026, 9:10 pm", space: "5.7 GB free on your Archive Drive",
+    button: "Back up",
+  },
+  bigBacklog: {
+    label: "Big backlog + warnings", drive: true, sentence: "502 photos backed up",
+    newLine: "3,660 new photos and videos · 41.2 GB to back up",
+    long: "This will take about 4 h 10 min and use about 41% battery. Charge to at least 56% first.",
+    spaceWarn: "41.2 GB still to back up, but only 5.7 GB is free on this drive",
+    last: "Last backed up 3 days ago", date: "10 Oct 2026, 6:30 pm", space: "5.7 GB free on your Archive Drive",
+    button: "Back up",
+  },
+  running: {
+    label: "Run going", drive: true, sentence: "Backing up your photos", progress: "Backed up 48 of 200", frac: .24,
+    unplug: "You can unplug your drive any time. Backup carries on when you plug it back in.",
+    pace: "12 min so far · about 20 min left",
+    last: "Last backed up yesterday", date: "12 Oct 2026, 9:10 pm", space: "5.7 GB free on your Archive Drive",
+    button: "Pause", running: true,
+  },
+  limit: {
+    label: "Stopped at a limit", drive: true, sentence: "Size limit reached. 3,660 files left.", progress: "Backed up 502 of 4,162", frac: .12,
+    newLine: "3,660 new photos and videos · 41.2 GB to back up",
+    last: "Last backed up 2 minutes ago", date: "13 Oct 2026, 8:02 pm", took: "Last backup took 45 min", space: "5.7 GB free on your Archive Drive",
+    button: "Back up more", limitSub: "That is a normal stop. Back up more continues where it left off.",
+  },
+  driveOut: {
+    label: "Drive not connected", drive: false, sentence: "502 photos backed up",
+    last: "Last backed up 6 hours ago", date: "13 Oct 2026, 1:55 pm",
+    button: "Plug in your drive", off: true,
+  },
+};
+
+/* ---------- NOW: reproduces HomeScreen.kt order ---------- */
+function homeNow(s) {
+  const chip = s.drive
+    ? `<div class="chip ok">${ic("check")}Drive connected</div>`
+    : `<div class="chip warn">${ic("clock")}Drive not connected</div>`;
+  const bar = s.frac != null ? `<div class="bar"><i style="width:${s.frac * 100}%"></i></div>` : "";
+  const btn = s.all ? "" : s.running
+    ? `<div class="btn tonal">${s.button}</div>`
+    : `<div class="btn ${s.off ? "off" : ""}">${s.button}</div>${s.drive ? "" : `<button class="txtbtn">Reconnect</button>`}`;
+  return `
+  <div class="now-head">${logo()}</div>
+  <div class="now-home">
+    ${chip}
+    <div class="stack8">
+      ${s.all ? `<span class="ico-p">${ic("check").replace('class="i ', 'style="width:40px;height:40px" class="i ')}</span>` : ""}
+      <div class="t-head">${FIG(s.sentence)}</div>
+      ${s.progress ? `<div class="t-body var">${s.progress}</div>` : ""}
+      ${s.all ? `<div class="t-body var">Everything on your phone is safe on your Archive Drive. Pull down to check for new photos.</div>` : ""}
+      ${s.newLine ? `<div class="t-body var">${s.newLine}</div>` : ""}
+      ${s.unplug ? `<div class="t-bodym var">${s.unplug}</div>` : ""}
+      ${s.pace ? `<div class="t-bodym var">${s.pace}</div>` : ""}
+    </div>
+    ${bar}
+    <div style="display:flex;gap:8px;align-items:center"><span class="var">${ic("clock").replace("24px", "20px")}</span>
+      <div><div class="t-body var">${s.last}</div><div class="t-bodym var">${s.date}</div>${s.took ? `<div class="t-bodym var">${s.took}</div>` : ""}</div></div>
+    ${s.space ? `<div class="t-body var">${s.space}</div>` : ""}
+    ${s.spaceWarn ? `<div class="chip warn">${ic("warn")}${s.spaceWarn}</div>` : ""}
+    ${s.long ? `<div class="chip warn">${ic("warn")}${s.long}</div>` : ""}
+    ${btn}
+    <div class="rowcard">${ic("folder", "ico-p")}<div class="tx"><div class="t-title">Your photos</div><div class="t-bodym var">Browse your Previews</div></div>${ic("chev")}</div>
+    <div class="rowcard">${ic("hist", "ico-p")}<div class="tx"><div class="t-title">Backup history</div><div class="t-bodym var">By month and by backup</div></div>${ic("chev")}</div>
+  </div>`;
+}
+
+/* ---------- PROPOSED ---------- */
+function homeNew(s) {
+  const pill = s.drive
+    ? `<span class="pill ok">${ic("check")}Drive connected</span>`
+    : `<span class="pill warn">${ic("clock")}Drive not connected</span>`;
+  const sub = s.all
+    ? `<div class="sub">${ic("check")}<div class="t-body var">${s.sub}</div></div>`
+    : s.limitSub ? `<div class="t-body var">${s.limitSub}</div>`
+    : s.running ? `` : "";
+  // One state card holds everything about the thing happening now.
+  let card = "";
+  if (s.running || s.limit === undefined && s.progress) {
+    card = "";
+  }
+  if (s.running) {
+    card = `<div class="state">
+      <div class="row"><span class="t-title">${s.progress}</span><span class="t-bodym var">${s.pace.split(" · ")[0]}</span></div>
+      <div class="bar"><i style="width:${s.frac * 100}%"></i></div>
+      <div class="t-bodym var">${s.pace.split(" · ")[1]}</div>
+      <div class="t-bodym var foot">${s.unplug}</div>
+    </div>`;
+  } else if (s.newLine) {
+    const [count, size] = s.newLine.split(" · ");
+    card = `<div class="state">
+      <div class="row"><span class="t-title">${count}</span></div>
+      <div class="t-bodym var">${size}${s.limit !== undefined || s.limitSub ? "" : ""}</div>
+      ${s.progress ? `<div class="bar"><i style="width:${s.frac * 100}%"></i></div><div class="t-bodym var">${s.progress}${s.took ? " · " + s.took : ""}</div>` : ""}
+      ${s.spaceWarn ? `<div class="note">${ic("warn")}<span class="t-bodym">${s.spaceWarn}</span></div>` : ""}
+      ${s.long ? `<div class="note">${ic("warn")}<span class="t-bodym">${s.long}</span></div>` : ""}
+    </div>`;
+  }
+  const btn = s.all ? "" : s.running
+    ? `<div class="btn tonal">${s.button}</div>`
+    : `<div class="btn ${s.off ? "off" : ""}">${s.button}</div>${s.drive ? "" : `<button class="txtbtn">Reconnect</button>`}`;
+  const facts = [s.last, s.space].filter(Boolean).map((x) => `<div>${x}</div>`).join("");
+  return `
+  <div class="new-home">
+    <div class="new-top">${logo()}${pill}</div>
+    <div class="hero">
+      <div class="t-head">${FIG(s.sentence)}</div>
+      ${sub}
+    </div>
+    ${card}
+    <div class="actions">${btn}</div>
+    <div class="rowcard">${ic("hist", "ico-p")}<div class="tx"><div class="t-title">Backup history</div><div class="t-bodym var">${facts}</div></div>${ic("chev")}</div>
+    ${s.all ? `<div class="t-bodym var" style="text-align:center;padding:14px 8px 0">Pull down to check for new photos</div>` : ""}
+  </div>`;
+}
+
+/* ---------- Photos (abstract placeholders only, never real photos) ---------- */
+function grid(n, seed, mode) {
+  let h = "";
+  for (let i = 0; i < n; i++) {
+    const a = (seed * 53 + i * 37) % 360, b = (a + 40 + (i % 5) * 18) % 360;
+    let vid = "";
+    if (i % 6 === 2) {
+      vid = mode === "new"
+        ? `<div class="vid">${ic("play")}0:${String(8 + i * 3).slice(-2).padStart(2, "0")}</div>`
+        : `<div class="vid" style="padding:0 10px 0 8px;font-size:13px">${ic("play")}Video</div>`;
+    }
+    h += `<div class="tile" style="background:linear-gradient(${(i * 47) % 180}deg,hsl(${a} 38% 38%),hsl(${b} 44% 58%))">${vid}<div class="badge">${ic("drive")}</div></div>`;
+  }
+  return `<div class="grid">${h}</div>`;
+}
+function photosNow() {
+  return `
+  <div class="now-pt"><span class="t-large">Photos</span></div>
+  <div class="now-seg"><div class="seg"><span class="sel">✓ Months</span><span>Days</span></div></div>
+  <div class="ph-pad">
+    <div class="mh now-mh">October 2026</div>${grid(12, 3, "now")}
+    <div class="mh now-mh">September 2026</div>${grid(9, 8, "now")}
+    <div class="legend t-bodym">${`<div class="badge">${ic("drive")}</div>`}<span>This mark means the Original is on your Archive Drive.</span></div>
+  </div>`;
+}
+function photosNew() {
+  return `
+  <div class="new-pt"><span class="t-head" style="font-size:calc(34px*var(--fs))">Photos</span>
+    <div class="seg"><span class="sel">Months</span><span>Days</span></div></div>
+  <div class="strip t-bodym"><div class="badge">${ic("drive")}</div><span>502 on your Archive Drive · 12 new waiting</span></div>
+  <div class="ph-pad">
+    <div class="mh t-month">October 2026</div>${grid(12, 3, "new")}
+    <div class="mh t-month">September 2026</div>${grid(9, 8, "new")}
+  </div>`;
+}
+
+/* ---------- type map minis ---------- */
+function miniEmpty() {
+  return `<div class="mini"><div class="screen"><div class="sb"><span>9:41</span><span></span></div>
+    <div class="new-pt"><span class="t-head">Photos</span></div>
+    <div class="empty"><div class="t-head">No photos yet</div><div class="t-body var">Previews of your photos will show here.</div></div>
+    <div class="nav"><div><span class="ind">${ic("home")}</span>Home</div><div class="on"><span class="ind">${ic("photos")}</span>Photos</div></div></div></div>`;
+}
+function miniHistory() {
+  const row = (m, c, st, ok, seed) => `<div class="mrow"><div class="strip4">${[0, 1, 2, 3].map((k) => `<div style="background:hsl(${(seed * 40 + k * 22) % 360} 40% 48%)"></div>`).join("")}</div>
+    <div style="flex:1"><div class="t-month" style="font-size:calc(22px*var(--fs));white-space:nowrap">${m}</div><div class="t-bodym var">${c}</div>
+    <div class="pillok" ${ok ? "" : 'style="color:var(--on-warn)"'}>${ic(ok ? "check" : "clock")}${st}</div></div></div>`;
+  return `<div class="mini"><div class="screen"><div class="sb"><span>9:41</span><span></span></div>
+    <div class="new-pt" style="padding-bottom:12px"><span class="t-head">Backup history</span></div>
+    ${row("October 2026", "210 photos", "Checked", true, 3)}
+    ${row("September 2026", "164 photos", "Checked", true, 6)}
+    ${row("August 2026", "128 photos", "Waiting", false, 9)}
+    </div></div>`;
+}
+function miniDialog() {
+  return `<div class="mini"><div class="screen" style="background:#0a0f0f55"><div class="sb"><span>9:41</span><span></span></div>
+    <div class="dlg"><div class="t-title2" style="font:400 calc(26px*var(--fs))/1.15 var(--serif)">Different Archive Drive</div>
+    <div class="t-body var">This is not the Archive Drive this phone remembers. Using it starts over on this drive.</div>
+    <div class="acts"><button class="txtbtn" style="padding:0 10px">Not now</button><button class="txtbtn" style="padding:0 10px">Use this drive</button></div></div></div></div>`;
+}
+
+/* ---------- wiring ---------- */
+let screen = "home", state = "allDone";
+function render() {
+  const s = STATES[state];
+  const sb = `<div class="sb"><span>9:41</span><span>62%</span></div>`;
+  const nav = (on) => `<div class="nav"><div class="${on === "home" ? "on" : ""}"><span class="ind">${ic("home")}</span>Home</div><div class="${on === "photos" ? "on" : ""}"><span class="ind">${ic("photos")}</span>Photos</div></div>`;
+  const fnav = (on) => `<div class="fnav"><div class="${on === "home" ? "on" : ""}">${ic("home")}Home</div><div class="${on === "photos" ? "on" : ""}">${ic("photos")}Photos</div></div>`;
+  const phone = (inner, on, floating) => floating
+    ? `<div class="phone"><div class="screen">${sb}<div class="body float">${inner}</div>${fnav(on)}</div></div>`
+    : `<div class="phone"><div class="screen">${sb}<div class="body">${inner}</div>${nav(on)}</div></div>`;
+  const home = screen === "home";
+  $("#stage").innerHTML = `
+    <div class="col"><div class="cap">Now</div>${phone(home ? homeNow(s) : photosNow(), screen)}</div>
+    <div class="col"><div class="cap new">Proposed</div>${phone(home ? homeNew(s) : photosNew(), screen, true)}</div>`;
+  $("#states").style.display = home ? "" : "none";
+  $("#typemap").classList.toggle("show", screen === "type");
+  $("#stage").style.display = screen === "type" ? "none" : "";
+  if (screen === "type") $("#tmgrid").innerHTML = miniEmpty() + miniHistory() + miniDialog();
+  document.querySelectorAll("#screens .chipb").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === screen));
+  document.querySelectorAll("#states .chipb").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === state));
+}
+[["home", "Home"], ["photos", "Photos"], ["type", "Type map"]].forEach(([k, t]) => {
+  const b = document.createElement("button"); b.className = "chipb"; b.dataset.k = k; b.textContent = t;
+  b.onclick = () => { screen = k; render(); }; $("#screens").append(b);
+});
+Object.entries(STATES).forEach(([k, v]) => {
+  const b = document.createElement("button"); b.className = "chipb"; b.dataset.k = k; b.textContent = v.label;
+  b.onclick = () => { state = k; render(); }; $("#states").append(b);
+});
+$("#theme").onclick = (e) => { const d = document.body.dataset.theme === "dark"; document.body.dataset.theme = d ? "light" : "dark"; e.target.setAttribute("aria-pressed", !d); e.target.textContent = d ? "Dark" : "Light"; render(); };
+$("#large").onclick = (e) => { const on = e.target.getAttribute("aria-pressed") !== "true"; document.documentElement.style.setProperty("--fs", on ? 1.3 : 1); e.target.setAttribute("aria-pressed", on); };
+const q = new URLSearchParams(location.search);
+if (q.get("screen")) screen = q.get("screen");
+if (q.get("state")) state = q.get("state");
+if (q.get("dark")) { document.body.dataset.theme = "dark"; }
+if (q.get("large")) document.documentElement.style.setProperty("--fs", 1.3);
+render();
+</script>
+</body>
+</html>
