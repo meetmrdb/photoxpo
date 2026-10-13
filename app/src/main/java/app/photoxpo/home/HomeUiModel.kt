@@ -6,6 +6,7 @@ import app.photoxpo.backup.BackupUiState
 import app.photoxpo.backup.PauseReason
 import app.photoxpo.backup.SessionAccess
 import app.photoxpo.backup.backupProgressText
+import app.photoxpo.backup.runFiles
 import app.photoxpo.backup.sessionAccessMessage
 import app.photoxpo.core.LOW_BATTERY_PERCENT
 import app.photoxpo.core.RunStage
@@ -257,6 +258,7 @@ private fun progressFraction(state: BackupUiState): Float? {
     if (state.status == BackupStatus.Running && state.runStage == RunStage.Checking && state.stageTotal > 0) {
         return (state.stageDone.toFloat() / state.stageTotal.toFloat()).coerceIn(0f, 1f)
     }
+    state.runFiles()?.let { return (it.done.toFloat() / it.total.toFloat()).coerceIn(0f, 1f) }
     if (state.totalCount <= 0) return null
     return (state.backedUpCount.toFloat() / state.totalCount.toFloat()).coerceIn(0f, 1f)
 }

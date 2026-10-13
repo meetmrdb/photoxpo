@@ -118,6 +118,9 @@ data class BackupUiState(
     val runStartedAtMillis: Long? = null,
     val runBytesToCopy: Long = 0L,
     val runBytesCopied: Long = 0L,
+    /** How many Originals this run set out to back up, and how many it has so far. Zero to copy means no own count. */
+    val runFilesToCopy: Int = 0,
+    val runFilesDone: Int = 0,
     val firstCopyAtMillis: Long? = null,
     val firstCopyBytes: Long = 0L,
     val lastRunTookMillis: Long? = null,
@@ -132,6 +135,7 @@ fun BackupUiState.runStarted(
     totalCount: Int,
     driveStatus: DriveStatus,
     bytesToCopy: Long = 0L,
+    filesToCopy: Int = 0,
     nowEpochMillis: Long = System.currentTimeMillis(),
 ): BackupUiState {
     val kept = if (message == MESSAGE_CONNECTED_DEVICE_FALLBACK) message else null
@@ -151,6 +155,8 @@ fun BackupUiState.runStarted(
         runStartedAtMillis = nowEpochMillis,
         runBytesToCopy = bytesToCopy,
         runBytesCopied = 0L,
+        runFilesToCopy = filesToCopy,
+        runFilesDone = 0,
         firstCopyAtMillis = null,
         firstCopyBytes = 0L,
     )
@@ -161,6 +167,7 @@ fun BackupUiState.withCopied(sizeBytes: Long, nowEpochMillis: Long): BackupUiSta
     if (status !is BackupStatus.Running) return this
     val first = firstCopyAtMillis == null
     return copy(
+        runFilesDone = runFilesDone + 1,
         runBytesCopied = runBytesCopied + sizeBytes,
         firstCopyAtMillis = firstCopyAtMillis ?: nowEpochMillis,
         firstCopyBytes = if (first) sizeBytes else firstCopyBytes,
@@ -172,10 +179,25 @@ fun BackupUiState.withBackedUpCount(backedUpCount: Int): BackupUiState {
     return copy(backedUpCount = backedUpCount)
 }
 
+/** How far this run is through the Originals it set out to back up. */
+data class RunFiles(val done: Int, val total: Int)
+
+/**
+ * This run's own progress, while it is copying or paused. Null while it is checking (the check has its own
+ * words), when it set out to back up nothing, or once it has ended, when the whole library's count says it better.
+ */
+fun BackupUiState.runFiles(): RunFiles? {
+    val going = status == BackupStatus.Running || status is BackupStatus.Paused
+    val checking = status == BackupStatus.Running && runStage == RunStage.Checking && stageTotal > 0
+    if (!going || checking || runFilesToCopy <= 0) return null
+    return RunFiles(done = runFilesDone.coerceAtMost(runFilesToCopy), total = runFilesToCopy)
+}
+
 fun backupProgressText(state: BackupUiState): String {
     if (state.status == BackupStatus.Running && state.runStage == RunStage.Checking && state.stageTotal > 0) {
         return "Checked ${state.stageDone} of ${state.stageTotal} already on your drive"
     }
+    state.runFiles()?.let { return "Backed up ${it.done} of ${it.total}" }
     if (state.totalCount > 0) {
         return "Backed up ${state.backedUpCount} of ${state.totalCount}"
     }

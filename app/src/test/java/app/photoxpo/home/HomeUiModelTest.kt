@@ -439,6 +439,15 @@ class HomeUiModelTest {
     }
 
     @Test
+    fun running_barShowsThisRunsFiles_notTheWholeLibrary() {
+        val running = base(status = BackupStatus.Running, backedUpCount = 503, totalCount = 506)
+            .copy(runStage = RunStage.Copying, runFilesToCopy = 4, runFilesDone = 1)
+        val model = homeUiModel(running, NOW)
+        assertEquals("Backed up 1 of 4", model.progressText)
+        assertEquals(0.25f, model.progressFraction!!, 0.0001f)
+    }
+
+    @Test
     fun nothingLeft_saysEverythingIsSafe_andHintsAtPullDown() {
         val done = homeUiModel(base(backedUpCount = 12, totalCount = 12).copy(filesToCopy = 0), NOW)
         assertEquals("Everything on your phone is safe on your Archive Drive.", done.heroSubline)

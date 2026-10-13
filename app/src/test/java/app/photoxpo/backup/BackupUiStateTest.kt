@@ -4,6 +4,7 @@ import app.photoxpo.core.BackupItemOutcome
 import app.photoxpo.core.BackupRunResult
 import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.ItemState
+import app.photoxpo.core.RunStage
 import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import org.junit.Assert.assertEquals
@@ -192,6 +193,51 @@ class BackupUiStateTest {
             .runStarted(totalCount = 9, driveStatus = DriveStatus.Ready)
         assertNull(started.stopReason)
         assertEquals(0, started.filesLeft)
+    }
+
+    @Test
+    fun runStarted_remembersHowManyFilesThisRunHasToBackUp() {
+        val started = BackupUiState().runStarted(totalCount = 506, driveStatus = DriveStatus.Ready, filesToCopy = 4)
+        assertEquals(4, started.runFilesToCopy)
+        assertEquals(0, started.runFilesDone)
+    }
+
+    @Test
+    fun eachNewFile_addsToTheRunsOwnCount() {
+        val running = BackupUiState().runStarted(totalCount = 506, driveStatus = DriveStatus.Ready, filesToCopy = 4)
+        val after = running.withCopied(10L, 1L).withCopied(20L, 2L)
+        assertEquals(2, after.runFilesDone)
+    }
+
+    @Test
+    fun whileCopying_progressIsThisRunsOwn_notTheWholeLibrarys() {
+        val state = BackupUiState().runStarted(totalCount = 506, driveStatus = DriveStatus.Ready, filesToCopy = 4)
+            .copy(backedUpCount = 503, runStage = RunStage.Copying, runFilesDone = 1)
+        assertEquals("Backed up 1 of 4", backupProgressText(state))
+        assertEquals(RunFiles(done = 1, total = 4), state.runFiles())
+    }
+
+    @Test
+    fun pausedMidRun_keepsThisRunsProgress() {
+        val paused = BackupUiState().runStarted(totalCount = 506, driveStatus = DriveStatus.Ready, filesToCopy = 4)
+            .copy(status = BackupStatus.Paused(PauseReason.User), runFilesDone = 2)
+        assertEquals("Backed up 2 of 4", backupProgressText(paused))
+    }
+
+    @Test
+    fun whileChecking_theCheckKeepsItsOwnWords() {
+        val checking = BackupUiState().runStarted(totalCount = 506, driveStatus = DriveStatus.Ready, filesToCopy = 4)
+            .copy(runStage = RunStage.Checking, stageDone = 320, stageTotal = 509)
+        assertEquals("Checked 320 of 509 already on your drive", backupProgressText(checking))
+        assertNull(checking.runFiles())
+    }
+
+    @Test
+    fun afterTheRun_progressIsTheWholeLibrarys_andARunWithNothingNewHasNoRunCount() {
+        val done = BackupUiState(status = BackupStatus.Done, backedUpCount = 340, totalCount = 4000, runFilesToCopy = 4, runFilesDone = 4)
+        assertEquals("Backed up 340 of 4000", backupProgressText(done))
+        val nothingNew = BackupUiState().runStarted(totalCount = 506, driveStatus = DriveStatus.Ready, filesToCopy = 0)
+        assertNull(nothingNew.runFiles())
     }
 
     private fun result(status: BackupRunStatus, vararg items: BackupItemOutcome): BackupRunResult {

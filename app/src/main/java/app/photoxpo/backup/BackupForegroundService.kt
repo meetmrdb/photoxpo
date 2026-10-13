@@ -222,7 +222,10 @@ class BackupForegroundService : Service() {
         } else {
             builder.setContentText(state.message ?: progress)
         }
-        if (state.totalCount > 0) {
+        val thisRun = state.runFiles()
+        if (thisRun != null) {
+            builder.setProgress(thisRun.total, thisRun.done, false)
+        } else if (state.totalCount > 0) {
             builder.setProgress(
                 state.totalCount,
                 state.backedUpCount.coerceAtMost(state.totalCount),
