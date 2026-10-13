@@ -438,6 +438,57 @@ class HomeUiModelTest {
         assertEquals("Backed up 5", homeUiModel(paused, NOW).progressText)
     }
 
+    @Test
+    fun nothingLeft_saysEverythingIsSafe_andHintsAtPullDown() {
+        val done = homeUiModel(base(backedUpCount = 12, totalCount = 12).copy(filesToCopy = 0), NOW)
+        assertEquals("Everything on your phone is safe on your Archive Drive.", done.heroSubline)
+        assertEquals("Pull down to check for new photos", done.pullHint)
+        val waiting = homeUiModel(base(backedUpCount = 12, totalCount = 15).copy(filesToCopy = 3), NOW)
+        assertNull(waiting.heroSubline)
+        assertNull(waiting.pullHint)
+    }
+
+    @Test
+    fun stoppedAtASizeOrTimeLimit_saysItIsANormalStop_butLowBatteryDoesNot() {
+        fun stopped(reason: StopReason) = homeUiModel(
+            base(status = BackupStatus.Done, backedUpCount = 340, totalCount = 4000, filesLeft = 3660, stopReason = reason),
+            NOW,
+        )
+        val normal = "That is a normal stop. Back up more continues where it left off."
+        assertEquals(normal, stopped(StopReason.SizeLimit).heroSubline)
+        assertEquals(normal, stopped(StopReason.TimeLimit).heroSubline)
+        assertNull(stopped(StopReason.LowBattery).heroSubline)
+    }
+
+    @Test
+    fun newWaiting_isSplitIntoTheCountAndTheSize() {
+        val withSize = homeUiModel(
+            base(backedUpCount = 509).copy(filesToCopy = 12, videosToCopy = 1, bytesToCopy = 1_400_000_000L),
+            NOW,
+        )
+        assertEquals("12 new photos and videos", withSize.newTitle)
+        assertEquals("1.4 GB to back up", withSize.newDetail)
+        val withoutSize = homeUiModel(base().copy(filesToCopy = 3, videosToCopy = 0), NOW)
+        assertEquals("3 new photos", withoutSize.newTitle)
+        assertNull(withoutSize.newDetail)
+        assertEquals("3 new photos to back up", withoutSize.newLine)
+    }
+
+    @Test
+    fun historyCard_carriesWhenItLastRun_andTheFreeSpace() {
+        val last = 1_000_000L
+        val roomy = homeUiModel(
+            base(lastBackedUpAtEpochMillis = last).copy(driveFreeBytes = 3_300_000_000L),
+            last + 3 * HOUR_MS,
+        )
+        assertEquals(
+            listOf("Last backed up 3 hours ago", "3.3 GB free on your Archive Drive"),
+            roomy.historyLines,
+        )
+        val noSpace = homeUiModel(base(lastBackedUpAtEpochMillis = last), last + 3 * HOUR_MS)
+        assertEquals(listOf("Last backed up 3 hours ago"), noSpace.historyLines)
+    }
+
     private fun base(
         status: BackupStatus = BackupStatus.Idle,
         backedUpCount: Int = 0,

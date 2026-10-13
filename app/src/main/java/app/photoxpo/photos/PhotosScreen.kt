@@ -56,7 +56,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.photoxpo.backup.BackupController
+import app.photoxpo.ui.theme.figuresInSans
+import androidx.compose.runtime.collectAsState
 import app.photoxpo.R
 import java.time.ZoneId
 import java.util.Locale
@@ -68,8 +74,10 @@ fun PhotosRoute(
     onOpenPhoto: (String) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    bottomClearance: Dp = 0.dp,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val backup by remember { BackupController.get(context).state }.collectAsState()
     var refreshing by remember { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val photos by produceState<List<PhotoEntity>?>(initialValue = null, repository) {
@@ -86,6 +94,8 @@ fun PhotosRoute(
         onOpenPhoto = onOpenPhoto,
         modifier = modifier,
         contentPadding = contentPadding,
+        bottomClearance = bottomClearance,
+        newWaiting = backup.filesToCopy,
         isRefreshing = refreshing,
         onRefresh = {
             refreshing = true
@@ -108,43 +118,67 @@ fun PhotosGrid(
     onOpenPhoto: (String) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    bottomClearance: Dp = 0.dp,
+    newWaiting: Int? = null,
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
 ) {
     var byDay by rememberSaveable { mutableStateOf(false) }
     Column(modifier = modifier.fillMaxSize().padding(contentPadding)) {
-        Text(
-            text = "Photos",
+        Row(
             modifier = Modifier
-                .defaultMinSize(minHeight = 64.dp)
-                .padding(horizontal = 20.dp)
-                .wrapContentHeight(Alignment.CenterVertically)
-                .semantics { heading() },
-            style = MaterialTheme.typography.titleLarge,
-        )
+                .padding(start = 20.dp, end = 16.dp, top = 8.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Photos",
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { heading() },
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            if (photos.isNotEmpty()) {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.widthIn(max = 220.dp)) {
+                    SegmentedButton(
+                        selected = !byDay,
+                        onClick = { byDay = false },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) {
+                        Text("Months")
+                    }
+                    SegmentedButton(
+                        selected = byDay,
+                        onClick = { byDay = true },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) {
+                        Text("Days")
+                    }
+                }
+            }
+        }
         if (photos.isEmpty()) {
             EmptyPhotos()
         } else {
-            SingleChoiceSegmentedButtonRow(
+            Row(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(start = 20.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                SegmentedButton(
-                    selected = !byDay,
-                    onClick = { byDay = false },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                ) {
-                    Text("Months")
-                }
-                SegmentedButton(
-                    selected = byDay,
-                    onClick = { byDay = true },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                ) {
-                    Text("Days")
-                }
+                // On the page background the photo scrim would vanish in dark theme, so the mark is inverted here.
+                DriveBadge(
+                    contentDescription = null,
+                    container = MaterialTheme.colorScheme.onSurfaceVariant,
+                    content = MaterialTheme.colorScheme.background,
+                )
+                Text(
+                    text = photosStripLine(photos.count { it.originalOnThisDrive }, newWaiting),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             PullToRefreshBox(
                 isRefreshing = isRefreshing,
@@ -156,6 +190,7 @@ fun PhotosGrid(
                     byDay = byDay,
                     previewCache = previewCache,
                     onOpenPhoto = onOpenPhoto,
+                    bottomClearance = bottomClearance,
                 )
             }
         }
@@ -169,6 +204,7 @@ private fun GroupedGrid(
     byDay: Boolean,
     previewCache: PreviewBitmapCache,
     onOpenPhoto: (String) -> Unit,
+    bottomClearance: Dp,
 ) {
     val zone = remember { ZoneId.systemDefault() }
     val locale = Locale.getDefault()
@@ -179,20 +215,19 @@ private fun GroupedGrid(
         val columns = if (maxWidth >= 600.dp) (maxWidth / 128.dp).toInt() else 3
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 3.dp),
+            contentPadding = PaddingValues(start = 3.dp, end = 3.dp, bottom = bottomClearance),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             for (group in groups) {
                 stickyHeader(key = "header-${group.label}", contentType = "header") {
                     Text(
-                        text = group.label,
+                        text = figuresInSans(group.label, figureSize = 19.sp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.background)
                             .padding(start = 13.dp, end = 13.dp, top = 16.dp, bottom = 8.dp)
                             .semantics { heading() },
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.titleLarge,
                     )
                 }
                 items(
@@ -215,28 +250,7 @@ private fun GroupedGrid(
                     }
                 }
             }
-            item(key = "legend", contentType = "legend") {
-                Legend()
-            }
         }
-    }
-}
-
-@Composable
-private fun Legend() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 13.dp, end = 13.dp, top = 16.dp, bottom = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        DriveBadge(contentDescription = null)
-        Text(
-            text = "This mark means the Original is on your Archive Drive.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -265,17 +279,22 @@ private fun EmptyPhotos() {
 }
 
 @Composable
-private fun DriveBadge(contentDescription: String?, modifier: Modifier = Modifier) {
+private fun DriveBadge(
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    container: Color = PhotoOverlay.Scrim,
+    content: Color = PhotoOverlay.OnScrim,
+) {
     Box(
         modifier = modifier
             .size(24.dp)
-            .background(PhotoOverlay.Scrim, CircleShape),
+            .background(container, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_archive_drive),
             contentDescription = contentDescription,
-            tint = PhotoOverlay.OnScrim,
+            tint = content,
             modifier = Modifier.size(15.dp),
         )
     }

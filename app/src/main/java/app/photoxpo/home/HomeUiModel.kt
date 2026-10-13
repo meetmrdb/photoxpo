@@ -1,8 +1,5 @@
 package app.photoxpo.home
 
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import app.photoxpo.backup.BackupStatus
 import app.photoxpo.backup.BackupUiState
@@ -42,23 +39,33 @@ data class HomeUiModel(
     val driveFull: Boolean = false,
     val allBackedUp: Boolean = false,
     val spaceLine: String? = null,
-    val paceLine: String? = null,
     val lastRunLine: String? = null,
     val spaceWarning: String? = null,
     val driveChipLabel: String = "Drive connected",
     val showProgress: Boolean = false,
-    val lastBackedUpDate: String? = null,
     val longRunWarning: String? = null,
     /** What is waiting to be Backed up, e.g. "12 new photos and videos · 1.4 GB to back up". */
     val newLine: String? = null,
     /** Said while a run is going, so unplugging the drive never feels risky. */
     val unplugReassurance: String? = null,
+    /** The one line under the headline: nothing left to do, or a stop that is normal. */
+    val heroSubline: String? = null,
+    /** Home's only instruction for a gesture, shown once there is nothing to start. */
+    val pullHint: String? = null,
+    /** What is waiting, e.g. "12 new photos and videos", for the state card. */
+    val newTitle: String? = null,
+    /** How big it is, e.g. "1.4 GB to back up". Null when the size is unknown. */
+    val newDetail: String? = null,
+    /** "12 min so far" and "about 20 min left", for the run card. */
+    val paceElapsed: String? = null,
+    val paceLeft: String? = null,
+    /** The lines on the Backup history card: when it last ran, and the free space. */
+    val historyLines: List<String> = emptyList(),
 )
 
 fun homeUiModel(
     state: BackupUiState,
     nowEpochMillis: Long,
-    zone: ZoneId = ZoneId.systemDefault(),
     locale: Locale = Locale.getDefault(),
 ): HomeUiModel {
     val lastBackedUpLine = lastBackedUpLine(state.lastBackedUpAtEpochMillis, nowEpochMillis)
@@ -76,17 +83,22 @@ fun homeUiModel(
         driveFull = state.status == BackupStatus.DriveFull,
         allBackedUp = allBackedUp(state),
         spaceLine = spaceLine(state),
-        paceLine = runPaceLine(state, nowEpochMillis),
         lastRunLine = lastRunLine(state),
         spaceWarning = spaceWarning(state),
         driveChipLabel = driveChipLabel(state.driveStatus),
         showProgress = state.status == BackupStatus.Running ||
             state.status is BackupStatus.Paused ||
             stopHeadline(state, locale) != null,
-        lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
         longRunWarning = longRunWarning(state),
         newLine = newLine(state, locale),
         unplugReassurance = unplugReassurance(state),
+        heroSubline = heroSubline(state, locale),
+        pullHint = if (allBackedUp(state)) PULL_HINT else null,
+        newTitle = newParts(state, locale)?.title,
+        newDetail = newParts(state, locale)?.detail,
+        paceElapsed = runPaceParts(state, nowEpochMillis)?.elapsed,
+        paceLeft = runPaceParts(state, nowEpochMillis)?.left,
+        historyLines = listOfNotNull(lastBackedUpLine, spaceLine(state)),
     )
 }
 
@@ -107,8 +119,10 @@ private fun stopHeadline(state: BackupUiState, locale: Locale): String? {
     }
 }
 
+internal data class NewParts(val title: String, val detail: String?)
+
 /** Shown only when idle: while a run goes the progress text already says how much is left. */
-internal fun newLine(state: BackupUiState, locale: Locale = Locale.getDefault()): String? {
+internal fun newParts(state: BackupUiState, locale: Locale = Locale.getDefault()): NewParts? {
     val settled = state.status == BackupStatus.Idle || state.status == BackupStatus.Done
     if (!settled || state.driveStatus != DriveStatus.Ready) return null
     val count = state.filesToCopy ?: return null
@@ -120,8 +134,15 @@ internal fun newLine(state: BackupUiState, locale: Locale = Locale.getDefault())
         else -> "photos and videos"
     }
     val number = java.text.NumberFormat.getIntegerInstance(locale).format(count)
-    val size = state.bytesToCopy?.let { " · ${formatBytes(it)} to back up" } ?: " to back up"
-    return "$number new $noun$size"
+    return NewParts(
+        title = "$number new $noun",
+        detail = state.bytesToCopy?.let { "${formatBytes(it)} to back up" },
+    )
+}
+
+internal fun newLine(state: BackupUiState, locale: Locale = Locale.getDefault()): String? {
+    val parts = newParts(state, locale) ?: return null
+    return parts.detail?.let { "${parts.title} · $it" } ?: "${parts.title} to back up"
 }
 
 internal const val UNPLUG_REASSURANCE =
@@ -129,6 +150,18 @@ internal const val UNPLUG_REASSURANCE =
 
 private fun unplugReassurance(state: BackupUiState): String? {
     return if (state.status == BackupStatus.Running) UNPLUG_REASSURANCE else null
+}
+
+internal const val PULL_HINT = "Pull down to check for new photos"
+
+private const val EVERYTHING_SAFE = "Everything on your phone is safe on your Archive Drive."
+private const val NORMAL_STOP = "That is a normal stop. Back up more continues where it left off."
+
+private fun heroSubline(state: BackupUiState, locale: Locale): String? {
+    if (allBackedUp(state)) return EVERYTHING_SAFE
+    val atALimit = stopHeadline(state, locale) != null &&
+        (state.stopReason == StopReason.SizeLimit || state.stopReason == StopReason.TimeLimit)
+    return if (atALimit) NORMAL_STOP else null
 }
 
 /** Everything in the Camera folder is Backed up, so there is nothing to start until a new photo appears. */
@@ -154,14 +187,6 @@ private fun spaceWarning(state: BackupUiState): String? {
     val toCopy = state.bytesToCopy ?: return null
     if (state.driveStatus != DriveStatus.Ready || toCopy <= free) return null
     return "${formatBytes(toCopy)} still to back up, but only ${formatBytes(free)} is free on this drive"
-}
-
-private fun lastBackedUpDate(epochMillis: Long?, zone: ZoneId, locale: Locale): String? {
-    epochMillis ?: return null
-    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a", locale)
-    return formatter.format(Instant.ofEpochMilli(epochMillis).atZone(zone))
-        .replace("AM", "am")
-        .replace("PM", "pm")
 }
 
 private fun driveChipLabel(status: DriveStatus): String {

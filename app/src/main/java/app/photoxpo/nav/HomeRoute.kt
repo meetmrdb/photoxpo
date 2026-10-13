@@ -7,6 +7,8 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,7 +39,7 @@ import app.photoxpo.home.HomeViewModel
 fun HomeRoute(
     modifier: Modifier = Modifier,
     onOpenHistory: () -> Unit = {},
-    onOpenPhotos: () -> Unit = {},
+    bottomClearance: Dp = 0.dp,
     onChooseDrive: (() -> Unit)? = null,
     onUseThisDriveInstead: (() -> Unit)? = null,
 ) {
@@ -101,7 +103,7 @@ fun HomeRoute(
             }
         },
         onOpenHistory = onOpenHistory,
-        onOpenPhotos = onOpenPhotos,
+        bottomClearance = bottomClearance,
         onChooseDrive = onChooseDrive ?: pickDrive,
         onUseThisDriveInstead = onUseThisDriveInstead ?: controller::useThisDriveInstead,
         onOpenSettings = {

@@ -21,54 +21,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import app.photoxpo.R
 
-enum class ChipTone { Neutral, Ok, Warn }
-
-/** A small status label. The icon and words carry the state; colour only reinforces it. */
-@Composable
-fun StatusChip(
-    label: String,
-    icon: Painter,
-    tone: ChipTone,
-    modifier: Modifier = Modifier,
-) {
-    val colors = MaterialTheme.colorScheme
-    val container: Color
-    val content: Color
-    when (tone) {
-        ChipTone.Neutral -> {
-            container = colors.surfaceContainer
-            content = colors.onSurface
-        }
-        ChipTone.Ok -> {
-            container = colors.primaryContainer
-            content = colors.onPrimaryContainer
-        }
-        ChipTone.Warn -> {
-            container = colors.tertiaryContainer
-            content = colors.onTertiaryContainer
-        }
-    }
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.small,
-        color = container,
-        contentColor = content,
-    ) {
-        Row(
-            modifier = Modifier
-                .defaultMinSize(minHeight = 36.dp)
-                .padding(start = 10.dp, end = 14.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(painter = icon, contentDescription = null, modifier = Modifier.size(20.dp))
-            Text(text = label, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium))
-        }
-    }
-}
-
-
-/** A tappable card with a leading icon, a title, one supporting line and a chevron. */
+/** A tappable card with a leading icon, a title, its supporting lines and a chevron. */
 @Composable
 fun RowCard(
     title: String,

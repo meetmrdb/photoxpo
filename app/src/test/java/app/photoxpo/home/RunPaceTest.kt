@@ -92,4 +92,13 @@ class RunPaceTest {
     fun notRunning_hasNoPaceLine() {
         assertNull(runPaceLine(running().copy(status = BackupStatus.Done), start + 30 * minute))
     }
+
+    @Test
+    fun theLine_isSplitIntoTimeSoFarAndTimeLeft() {
+        assertEquals(
+            RunPace(elapsed = "12 min so far", left = "checking photos already on your drive"),
+            runPaceParts(running(), start + 12 * minute),
+        )
+        assertNull(runPaceParts(running(), start + 30_000L))
+    }
 }
