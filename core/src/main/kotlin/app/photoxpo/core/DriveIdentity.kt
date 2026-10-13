@@ -71,7 +71,7 @@ class InMemoryBackedUpLedger : BackedUpLedger {
 
     override fun checkedOriginal(mediaId: String): CheckedOriginal? {
         val hash = stored[mediaId] ?: return null
-        return checks[mediaId] ?: CheckedOriginal(hash, -1L, -1L, null)
+        return checks[mediaId] ?: CheckedOriginal.unknown(hash)
     }
 
     override fun clear() {

@@ -47,7 +47,6 @@ data class HomeUiModel(
     val driveChipLabel: String = "Drive connected",
     val showProgress: Boolean = false,
     val lastBackedUpDate: String? = null,
-    val filesLeftLine: String? = null,
     val longRunWarning: String? = null,
 )
 
@@ -59,7 +58,7 @@ fun homeUiModel(
 ): HomeUiModel {
     val lastBackedUpLine = lastBackedUpLine(state.lastBackedUpAtEpochMillis, nowEpochMillis)
     return HomeUiModel(
-        statusSentence = statusSentence(state),
+        statusSentence = statusSentence(state, locale),
         primaryLabel = primaryLabel(state),
         primaryPauses = state.status == BackupStatus.Running,
         progressText = backupProgressText(state),
@@ -78,22 +77,26 @@ fun homeUiModel(
         driveChipLabel = driveChipLabel(state.driveStatus),
         showProgress = state.status == BackupStatus.Running ||
             state.status is BackupStatus.Paused ||
-            filesLeftLine(state, locale) != null,
+            stopHeadline(state, locale) != null,
         lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
-        filesLeftLine = filesLeftLine(state, locale),
         longRunWarning = longRunWarning(state),
     )
 }
 
-/** A run that ended at a limit is normal progress: how many files are left, never run counts. */
-private fun filesLeftLine(state: BackupUiState, locale: Locale): String? {
-    if (state.stopReason == null || state.filesLeft <= 0) return null
+/**
+ * A backup that stopped early is normal progress, so it is Home's headline: why, and how many files are left.
+ * Null when nothing was left behind or the stop has no wording of its own here (a full drive has its own status).
+ */
+private fun stopHeadline(state: BackupUiState, locale: Locale): String? {
+    val reason = state.stopReason ?: return null
+    if (state.filesLeft <= 0) return null
     val count = java.text.NumberFormat.getIntegerInstance(locale).format(state.filesLeft)
     val left = if (state.filesLeft == 1) "$count file left" else "$count files left"
-    if (state.stopReason == StopReason.LowBattery) {
-        return "Paused at $LOW_BATTERY_PERCENT% battery. $left. Charge, then reconnect your drive."
+    return when (reason) {
+        StopReason.LowBattery -> "Paused at $LOW_BATTERY_PERCENT% battery. $left. Charge, then reconnect your drive."
+        StopReason.SizeLimit, StopReason.TimeLimit -> "Time limit reached. $left."
+        StopReason.DriveFull -> null
     }
-    return left
 }
 
 /** Everything in the Camera folder is Backed up, so there is nothing to start until a new photo appears. */
@@ -151,14 +154,14 @@ fun homeAccessWarning(access: SessionAccess?): HomeAccessWarning? {
     )
 }
 
-private fun statusSentence(state: BackupUiState): String {
+private fun statusSentence(state: BackupUiState, locale: Locale): String {
     return when (val status = state.status) {
         BackupStatus.Idle,
         BackupStatus.Done,
-        -> backedUpSentence(state.backedUpCount)
+        -> stopHeadline(state, locale) ?: backedUpSentence(state.backedUpCount)
         BackupStatus.Running -> "Backing up your photos"
         is BackupStatus.Paused -> when (status.reason) {
-            PauseReason.User -> "Backup run paused"
+            PauseReason.User -> "Backup paused"
             PauseReason.DriveOut ->
                 if (state.driveStatus == DriveStatus.Ready) {
                     "Your Archive Drive is back"

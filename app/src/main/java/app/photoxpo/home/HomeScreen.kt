@@ -156,13 +156,6 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                model.filesLeftLine?.let { left ->
-                    Text(
-                        text = left,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 model.paceLine?.let { pace ->
                     Text(
                         text = pace,

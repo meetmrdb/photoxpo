@@ -20,7 +20,12 @@ data class CheckedOriginal(
     val sizeBytes: Long,
     val modifiedAtEpochMillis: Long,
     val checkedAt: Instant?,
-)
+) {
+    companion object {
+        /** A Backed up Original with no stored check details; never counts as checked recently. */
+        fun unknown(hash: String) = CheckedOriginal(hash, -1L, -1L, null)
+    }
+}
 
 /**
  * Decides whether an Original may be trusted as checked without reading it again.

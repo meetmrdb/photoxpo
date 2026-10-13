@@ -27,7 +27,8 @@ val RUN_HARD_STOP: Duration = Duration.ofHours(5)
 
 /**
  * Why a Backup run ended before every Original was Backed up. Each one is a normal result, never an error.
- * Later reasons (low battery, Android's time limit, Archive Drive full) are added here and in a [StopPolicy].
+ * Size, time and low battery come from a [StopPolicy]; Android's own time limit arrives as [TimeLimit]
+ * through the run's external stop request; [DriveFull] is raised by the run itself.
  */
 enum class StopReason {
     SizeLimit,

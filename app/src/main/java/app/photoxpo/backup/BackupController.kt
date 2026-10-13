@@ -17,6 +17,7 @@ import app.photoxpo.core.BackedUpLedger
 import app.photoxpo.core.MediaFile
 import app.photoxpo.core.ItemState
 import app.photoxpo.core.RecentRun
+import app.photoxpo.core.StopReason
 import app.photoxpo.core.byBackup
 import java.time.Duration
 import app.photoxpo.PhotoxpoApp
@@ -42,6 +43,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,6 +62,7 @@ class BackupController private constructor(
     private val runGate = Any()
     private val cancel = AtomicBoolean(false)
     private val userStop = AtomicBoolean(false)
+    private val timeLimitStop = AtomicBoolean(false)
     private val libraryRefreshing = AtomicBoolean(false)
     private val pauseReason = AtomicReference(PauseReason.User)
     private val wakeLockGate = Any()
@@ -95,6 +99,7 @@ class BackupController private constructor(
     fun start() {
         if (runJob?.isActive == true) return
         userStop.set(false)
+        timeLimitStop.set(false)
         cancel.set(false)
         pauseReason.set(PauseReason.User)
         val blocked = currentSessionAccess()
@@ -159,6 +164,28 @@ class BackupController private constructor(
         }
     }
 
+    /**
+     * Android's time limit on the foreground service: ask the run to end cleanly. The run finishes the
+     * Original it is copying, then stops with [StopReason.TimeLimit] and the files left, like any other stop.
+     */
+    internal fun requestTimeLimitStop() {
+        timeLimitStop.set(true)
+    }
+
+    /**
+     * Waits up to [timeoutMs] for the copying to stop after [requestTimeLimitStop]. If the current Original
+     * is not finished in time, pauses between Originals instead, so the service can always stop promptly.
+     * Returns true when the run ended cleanly as a time-limit stop.
+     */
+    internal suspend fun awaitTimeLimitStop(timeoutMs: Long): Boolean {
+        val ended = withTimeoutOrNull(timeoutMs) {
+            _state.first { it.status != BackupStatus.Running }
+            true
+        } ?: false
+        if (!ended) pause()
+        return ended
+    }
+
     internal fun beginRun() {
         synchronized(runGate) {
             if (userStop.get()) return
@@ -171,6 +198,7 @@ class BackupController private constructor(
             }
             val uri = settings.treeUri() ?: return
             cancel.set(false)
+            timeLimitStop.set(false)
             runJob = scope.launch {
                 settings.setRunActive(true)
                 // Free space on the drive shifts as files land; keep Home's number fresh during a long run.
@@ -316,6 +344,7 @@ class BackupController private constructor(
                         backedUpLedger = progressLedger(recorded, sizeById),
                         previewPreset = settings.previewPreset(),
                         isCancelled = { cancel.get() },
+                        externalStop = { if (timeLimitStop.get()) StopReason.TimeLimit else null },
                         batteryInput = AndroidBatteryInput(appContext),
                     ).start()
                     RunOutcome(result, probeOrAbsent(uri))
@@ -477,23 +506,27 @@ class BackupController private constructor(
     }
 
     private fun progressLedger(recorded: AtomicInteger, sizeById: Map<String, Long> = emptyMap()): BackedUpLedger {
+        // A run walks every photo again and re-confirms the old ones. Only a new one adds to the count.
+        fun countIfNew(mediaId: String, isNew: Boolean) {
+            if (!isNew) return
+            val size = sizeById[mediaId] ?: 0L
+            _state.update {
+                it.withBackedUpCount(recorded.incrementAndGet())
+                    .withCopied(size, System.currentTimeMillis())
+            }
+        }
         return object : BackedUpLedger {
             override fun record(mediaId: String, hash: String) {
-                // A run walks every photo again and re-confirms the old ones. Only a new one adds to the count.
                 val isNew = !settings.hasRecorded(mediaId)
                 settings.record(mediaId, hash)
-                if (isNew) {
-                    val size = sizeById[mediaId] ?: 0L
-                    _state.update {
-                        it.withBackedUpCount(recorded.incrementAndGet())
-                            .withCopied(size, System.currentTimeMillis())
-                    }
-                }
+                countIfNew(mediaId, isNew)
             }
 
             override fun recordChecked(file: MediaFile, hash: String, checkedAt: java.time.Instant) {
-                record(file.id, hash)
+                val isNew = !settings.hasRecorded(file.id)
+                // recordChecked writes the ledger entry too, so this is one write.
                 settings.recordChecked(file, hash, checkedAt)
+                countIfNew(file.id, isNew)
             }
 
             override fun checkedOriginal(mediaId: String) = settings.checkedOriginal(mediaId)
