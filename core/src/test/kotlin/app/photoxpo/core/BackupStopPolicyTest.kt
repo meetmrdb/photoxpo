@@ -76,6 +76,34 @@ class BackupStopPolicyTest {
     }
 
     @Test
+    fun runEndsAtTheFiveHourSafetyStop_withTimeLimitReasonAndFilesLeft_evenIfTheNormalLimitIsLonger() {
+        assertEquals(Duration.ofHours(5), RUN_HARD_STOP)
+        val root = folders.newFolder("hard").toPath()
+        val drive = FakeArchiveDrive(root)
+        val files = (1..5).map { sample(it, size = 4) }
+        val clock = MutableClock(START)
+        val result = BackupRunner(
+            mediaSource = FakeMediaSource(files.map { it.file to it.bytes }),
+            archiveDrive = drive,
+            clock = clock,
+            // Each Original takes two hours.
+            backedUpLedger = object : BackedUpLedger {
+                override fun record(mediaId: String, hash: String) = clock.advance(Duration.ofHours(2))
+
+                override fun clear() = Unit
+            },
+            stopPolicy = DefaultStopPolicy(maxCopiedBytes = 1_000, maxElapsed = Duration.ofHours(24)),
+        ).start()
+
+        assertEquals(BackupRunStatus.Completed, result.status)
+        assertEquals(StopReason.TimeLimit, result.stopReason)
+        // Started at 0, 2, 4 hours; the 6 hour mark is past the safety stop.
+        assertEquals(2, result.filesLeft)
+        assertEquals(3, result.items.count { it.state == ItemState.COMMITTED })
+        assertNoPartFiles(root)
+    }
+
+    @Test
     fun nextRun_continuesWhereTheStoppedRunLeftOff_andEndsWithNoReason() {
         val root = folders.newFolder("next").toPath()
         val files = (1..5).map { sample(it, size = 4) }
