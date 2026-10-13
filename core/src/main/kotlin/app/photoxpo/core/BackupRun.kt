@@ -138,7 +138,14 @@ class BackupRunner(
                         nextFileBytes = file.sizeBytes,
                     ),
                 )
-                val copied = copier.copy(file, allowNewCopy = reasonNow == null)
+                val copied = try {
+                    copier.copy(file, allowNewCopy = reasonNow == null)
+                } catch (_: DriveFullException) {
+                    // Same stop path as the limits: this Original and the rest wait for the next run.
+                    stopReason = StopReason.DriveFull
+                    deferred += file.id
+                    continue
+                }
                 if (copied.deferredByCap) {
                     stopReason = reasonNow
                     deferred += file.id
