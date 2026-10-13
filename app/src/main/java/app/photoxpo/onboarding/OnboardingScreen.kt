@@ -3,33 +3,28 @@ package app.photoxpo.onboarding
 import android.Manifest
 import android.content.Intent
 import android.content.res.Configuration
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Icon
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -42,25 +37,29 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -73,8 +72,6 @@ import app.photoxpo.core.PreviewPreset
 import app.photoxpo.drive.DrivePickResult
 import app.photoxpo.drive.rememberDrivePicker
 import app.photoxpo.ui.theme.PhotoxpoTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 private val mediaAccessPermissions = arrayOf(
     Manifest.permission.READ_MEDIA_IMAGES,
@@ -125,14 +122,13 @@ fun OnboardingScreen(
     }
 
     LaunchedEffect(ui.onboarding.step) {
-        when (ui.onboarding.step) {
-            OnboardingStep.PhotosAccess -> viewModel.refreshAccess()
-            OnboardingStep.PreviewQuality -> viewModel.ensurePreviewPhoto()
-            else -> Unit
-        }
+        if (ui.onboarding.step == OnboardingStep.PhotosAccess) viewModel.refreshAccess()
+    }
+    LaunchedEffect(ui.onboarding.choosingPreviews) {
+        if (ui.onboarding.choosingPreviews) viewModel.ensurePreviewPhoto()
     }
 
-    BackHandler(enabled = ui.onboarding.step != OnboardingStep.Welcome) {
+    BackHandler(enabled = ui.onboarding.step != OnboardingStep.Welcome || ui.onboarding.choosingPreviews) {
         viewModel.onEvent(OnboardingEvent.Back)
     }
 
@@ -165,6 +161,7 @@ fun OnboardingScreen(
             onFinished()
         }
     }
+    val back = { viewModel.onEvent(OnboardingEvent.Back) }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -181,7 +178,7 @@ fun OnboardingScreen(
                 onOpenSettings = openSettings,
                 onTryAgain = requestAccess,
                 onContinue = { viewModel.onEvent(OnboardingEvent.Next) },
-                onBack = { viewModel.onEvent(OnboardingEvent.Back) },
+                onBack = back,
             )
             OnboardingStep.ArchiveDrive -> ArchiveDriveStep(
                 driveChosen = ui.onboarding.driveChosen,
@@ -189,9 +186,18 @@ fun OnboardingScreen(
                 onChoose = pickDrive,
                 onLater = { viewModel.deferDrive() },
                 onContinue = { viewModel.onEvent(OnboardingEvent.Next) },
-                onBack = { viewModel.onEvent(OnboardingEvent.Back) },
+                onBack = back,
             )
-            OnboardingStep.PreviewQuality -> PreviewQualityStep(
+            OnboardingStep.Ready -> ReadyStep(
+                summary = readySummary(ui.onboarding),
+                onChooseDrive = pickDrive,
+                onChangePreviews = { viewModel.onEvent(OnboardingEvent.OpenPreviews) },
+                onFinish = finish,
+                onBack = back,
+            )
+        }
+        if (ui.onboarding.choosingPreviews) {
+            PreviewsSheet(
                 preset = ui.onboarding.preset,
                 usingSample = ui.usingSample,
                 photoName = ui.photoName,
@@ -212,29 +218,42 @@ fun OnboardingScreen(
                 images = PreviewPreset.entries.associateWith { ui.cards[it]?.preview },
                 onPreset = { viewModel.onEvent(OnboardingEvent.PresetChosen(it)) },
                 onTryAnother = { viewModel.tryAnotherPhoto() },
-                onContinue = { viewModel.onEvent(OnboardingEvent.Next) },
-                onBack = { viewModel.onEvent(OnboardingEvent.Back) },
-            )
-            OnboardingStep.Ready -> ReadyStep(
-                summary = readySummary(ui.onboarding),
-                onFinish = finish,
-                onBack = { viewModel.onEvent(OnboardingEvent.Back) },
+                onDone = { viewModel.onEvent(OnboardingEvent.ClosePreviews) },
             )
         }
     }
 }
+
+private const val STEP_COUNT = 4
 
 @Composable
 private fun WelcomeStep(
     onGetStarted: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    StepColumn(modifier) {
-        StepLabel(OnboardingStep.Welcome)
-        ScreenTitle(stringResource(R.string.onboarding_welcome_sentence))
-        BigButton(
-            label = stringResource(R.string.onboarding_get_started),
-            onClick = onGetStarted,
+    StepFrame(
+        index = 0,
+        onBack = null,
+        modifier = modifier,
+        actions = {
+            BigButton(
+                label = stringResource(R.string.onboarding_get_started),
+                onClick = onGetStarted,
+            )
+        },
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_logo_full),
+            contentDescription = "Photoxpo",
+            modifier = Modifier.height(44.dp),
+            tint = MaterialTheme.colorScheme.onSurface,
+        )
+        OriginalAndPreview()
+        ScreenTitle(stringResource(R.string.onboarding_welcome_title))
+        WrappingText(
+            text = stringResource(R.string.onboarding_welcome_body),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -255,66 +274,66 @@ private fun PhotosAccessStep(
     } else {
         null
     }
-    StepColumn(modifier) {
-        BackButton(onBack)
-        StepLabel(OnboardingStep.PhotosAccess)
+    StepFrame(
+        index = 1,
+        onBack = onBack,
+        modifier = modifier,
+        actions = {
+            if (access == MediaAccessState.Full) {
+                BigButton(
+                    label = stringResource(R.string.onboarding_continue),
+                    onClick = onContinue,
+                )
+            } else if (warning != null) {
+                when (warning.action) {
+                    AccessAction.OpenSettings -> {
+                        BigButton(
+                            label = stringResource(R.string.onboarding_open_settings),
+                            onClick = onOpenSettings,
+                        )
+                        QuietButton(
+                            label = stringResource(R.string.onboarding_try_again),
+                            onClick = onTryAgain,
+                        )
+                    }
+                    AccessAction.TryAgain -> {
+                        BigButton(
+                            label = stringResource(R.string.onboarding_try_again),
+                            onClick = onTryAgain,
+                        )
+                        QuietButton(
+                            label = stringResource(R.string.onboarding_open_settings),
+                            onClick = onOpenSettings,
+                        )
+                    }
+                }
+            } else {
+                BigButton(
+                    label = stringResource(R.string.onboarding_photos_allow),
+                    onClick = onAllow,
+                )
+            }
+        },
+    ) {
         ScreenTitle(stringResource(R.string.onboarding_photos_title))
-        WrappingText(
-            text = stringResource(R.string.onboarding_photos_body),
-            style = MaterialTheme.typography.bodyLarge,
+        InfoCard(
+            icon = R.drawable.ic_folder_photos,
+            title = stringResource(R.string.onboarding_photos_card_title),
+            body = stringResource(R.string.onboarding_photos_card_body),
         )
         if (access != MediaAccessState.Full) {
-            WrappingText(
-                text = stringResource(R.string.onboarding_photos_allow_all),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            WrappingText(
-                text = stringResource(R.string.onboarding_photos_select_warning),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            WhatThePhoneWillAsk()
         }
         if (access == MediaAccessState.Full) {
             ToneCard(
                 text = stringResource(R.string.onboarding_photos_seen),
                 error = false,
             )
-            BigButton(
-                label = stringResource(R.string.onboarding_continue),
-                onClick = onContinue,
-            )
         } else if (warning != null) {
             ToneCard(
                 title = warning.title,
                 text = warning.message,
                 error = true,
-            )
-            when (warning.action) {
-                AccessAction.OpenSettings -> {
-                    BigButton(
-                        label = stringResource(R.string.onboarding_open_settings),
-                        onClick = onOpenSettings,
-                    )
-                    QuietButton(
-                        label = stringResource(R.string.onboarding_try_again),
-                        onClick = onTryAgain,
-                    )
-                }
-                AccessAction.TryAgain -> {
-                    BigButton(
-                        label = stringResource(R.string.onboarding_try_again),
-                        onClick = onTryAgain,
-                    )
-                    QuietButton(
-                        label = stringResource(R.string.onboarding_open_settings),
-                        onClick = onOpenSettings,
-                    )
-                }
-            }
-        } else {
-            BigButton(
-                label = stringResource(R.string.onboarding_photos_allow),
-                onClick = onAllow,
             )
         }
     }
@@ -330,41 +349,211 @@ private fun ArchiveDriveStep(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    StepColumn(modifier) {
-        BackButton(onBack)
-        StepLabel(OnboardingStep.ArchiveDrive)
+    StepFrame(
+        index = 2,
+        onBack = onBack,
+        modifier = modifier,
+        actions = {
+            if (driveChosen) {
+                BigButton(
+                    label = stringResource(R.string.onboarding_continue),
+                    onClick = onContinue,
+                )
+                QuietButton(
+                    label = stringResource(R.string.onboarding_drive_choose_again),
+                    onClick = onChoose,
+                )
+            } else {
+                BigButton(
+                    label = stringResource(R.string.onboarding_drive_choose),
+                    onClick = onChoose,
+                )
+                QuietButton(
+                    label = stringResource(R.string.onboarding_drive_later),
+                    onClick = onLater,
+                )
+                WrappingText(
+                    text = stringResource(R.string.onboarding_drive_later_note),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        },
+    ) {
         ScreenTitle(stringResource(R.string.onboarding_drive_title))
-        WrappingText(
-            text = stringResource(R.string.onboarding_drive_body),
-            style = MaterialTheme.typography.bodyLarge,
+        NumberedStep(number = 1, title = stringResource(R.string.onboarding_drive_step_plug))
+        NumberedStep(
+            number = 2,
+            title = stringResource(R.string.onboarding_drive_step_choose),
+            body = stringResource(R.string.onboarding_drive_step_choose_body),
         )
         if (driveChosen) {
             ToneCard(
                 text = stringResource(R.string.onboarding_drive_ready),
                 error = false,
             )
-            BigButton(
-                label = stringResource(R.string.onboarding_continue),
-                onClick = onContinue,
+        } else if (driveMessage != null) {
+            ToneCard(text = driveMessage, error = true)
+        }
+    }
+}
+
+@Composable
+private fun ReadyStep(
+    summary: ReadySummary,
+    onChooseDrive: () -> Unit,
+    onChangePreviews: () -> Unit,
+    onFinish: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val lines = readyLines(summary)
+    StepFrame(
+        index = 3,
+        onBack = onBack,
+        modifier = modifier,
+        actions = { BigButton(label = lines.button, onClick = onFinish) },
+    ) {
+        ScreenTitle(stringResource(R.string.onboarding_ready_title))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp),
+        ) {
+            SummaryRow(
+                icon = if (summary.driveChosen) R.drawable.ic_check_circle else R.drawable.ic_schedule,
+                iconTint = if (summary.driveChosen) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                label = stringResource(R.string.onboarding_ready_drive_label),
+                value = lines.driveValue,
+                action = if (summary.driveChosen) null else stringResource(R.string.onboarding_choose),
+                onAction = onChooseDrive,
             )
-            QuietButton(
-                label = stringResource(R.string.onboarding_drive_choose_again),
-                onClick = onChoose,
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SummaryRow(
+                icon = R.drawable.ic_folder_photos,
+                iconTint = MaterialTheme.colorScheme.primary,
+                label = stringResource(R.string.onboarding_ready_previews_label),
+                value = lines.previewsValue,
+                action = stringResource(R.string.onboarding_change),
+                onAction = onChangePreviews,
             )
-        } else {
-            if (driveMessage != null) {
-                ToneCard(text = driveMessage, error = true)
-            }
-            BigButton(
-                label = stringResource(R.string.onboarding_drive_choose),
-                onClick = onChoose,
-            )
-            QuietButton(
-                label = stringResource(R.string.onboarding_drive_later),
-                onClick = onLater,
-            )
+        }
+        lines.note?.let { note ->
             WrappingText(
-                text = stringResource(R.string.onboarding_drive_later_note),
+                text = note,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The one idea of the app as a picture: the Original goes to the drive, a Preview stays on the phone. */
+@Composable
+private fun OriginalAndPreview() {
+    val colors = MaterialTheme.colorScheme
+    val description = stringResource(R.string.onboarding_welcome_diagram)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics { contentDescription = description },
+        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DiagramNode(
+            label = stringResource(R.string.onboarding_preview_label),
+            where = stringResource(R.string.onboarding_on_phone),
+        ) {
+            val tints = listOf(colors.primary, colors.secondary)
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                repeat(3) { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        repeat(3) { column ->
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .background(
+                                        tints[(row + column) % tints.size].copy(alpha = 0.55f + 0.1f * ((row * 3 + column) % 4)),
+                                        RoundedCornerShape(2.dp),
+                                    ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        Icon(
+            painter = painterResource(R.drawable.ic_back),
+            contentDescription = null,
+            tint = colors.primary,
+            modifier = Modifier
+                .size(28.dp)
+                .rotate(180f),
+        )
+        DiagramNode(
+            label = stringResource(R.string.onboarding_original_label),
+            where = stringResource(R.string.onboarding_on_drive),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_archive_drive),
+                contentDescription = null,
+                tint = colors.primary,
+                modifier = Modifier.size(56.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiagramNode(label: String, where: String, picture: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier.width(132.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp)),
+            contentAlignment = Alignment.Center,
+        ) { picture() }
+        Text(text = label, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        Text(
+            text = where,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun InfoCard(icon: Int, title: String, body: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(28.dp),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = body,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -372,250 +561,210 @@ private fun ArchiveDriveStep(
     }
 }
 
+/** What the system dialog will offer, with the right answer marked. Decorative: the sentence above it says the same. */
 @Composable
-private fun PreviewQualityStep(
-    preset: PreviewPreset,
-    usingSample: Boolean,
-    photoName: String?,
-    originalBytes: Long?,
-    canTryAnother: Boolean,
-    cards: List<QualityCardModel>,
-    images: Map<PreviewPreset, PreviewJpeg?>,
-    onPreset: (PreviewPreset) -> Unit,
-    onTryAnother: () -> Unit,
-    onContinue: () -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    StepColumn(modifier) {
-        BackButton(onBack)
-        StepLabel(OnboardingStep.PreviewQuality)
-        ScreenTitle(stringResource(R.string.onboarding_quality_title))
+private fun WhatThePhoneWillAsk() {
+    val colors = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         WrappingText(
-            text = stringResource(R.string.onboarding_quality_body),
-            style = MaterialTheme.typography.bodyLarge,
+            text = stringResource(R.string.onboarding_photos_ask_next),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceVariant,
         )
-        val original = if (usingSample) null else originalSizeLabel(originalBytes)
-        val detail = when {
-            usingSample -> stringResource(R.string.onboarding_no_photos)
-            else -> listOfNotNull(photoName, original).joinToString("\n")
-        }
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(20.dp))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .clearAndSetSemantics { }
+                .background(colors.surfaceContainerHighest, RoundedCornerShape(20.dp))
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(
-                        if (usingSample) R.string.onboarding_sample_photo else R.string.onboarding_your_photo,
-                    ),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                if (detail.isNotBlank()) {
-                    Text(
-                        text = detail,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (canTryAnother) {
-                FilledTonalButton(
-                    onClick = onTryAnother,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                ) {
-                    Text(stringResource(R.string.onboarding_try_another))
-                }
-            }
+            MockChoice(stringResource(R.string.onboarding_mock_allow_all), highlighted = true)
+            MockChoice(stringResource(R.string.onboarding_mock_select), highlighted = false)
+            MockChoice(stringResource(R.string.onboarding_mock_deny), highlighted = false)
         }
-        cards.forEach { card ->
-            QualityCard(
-                model = card,
-                image = images[card.preset],
-                onSelect = { onPreset(card.preset) },
-            )
-        }
-        BigButton(
-            label = usePresetLabel(preset),
-            onClick = onContinue,
+        WrappingText(
+            text = stringResource(R.string.onboarding_photos_select_warning),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun ReadyStep(
-    summary: ReadySummary,
-    onFinish: () -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val lines = readyLines(summary)
-    StepColumn(modifier) {
-        BackButton(onBack)
-        StepLabel(OnboardingStep.Ready)
-        ScreenTitle(stringResource(R.string.onboarding_ready_title))
-        WrappingText(
-            text = lines.archiveDrive,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        WrappingText(
-            text = lines.previews,
-            style = MaterialTheme.typography.bodyLarge,
-        )
-        val note = lines.note
-        if (note != null) {
-            WrappingText(
-                text = note,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-        BigButton(label = lines.button, onClick = onFinish)
-    }
-}
-
-@Composable
-private fun QualityCard(
-    model: QualityCardModel,
-    image: PreviewJpeg?,
-    onSelect: () -> Unit,
-) {
+private fun MockChoice(label: String, highlighted: Boolean) {
     val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(20.dp)
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (model.selected) colors.primaryContainer else colors.background, shape)
-            .border(
-                width = 2.dp,
-                color = if (model.selected) colors.primary else colors.outlineVariant,
-                shape = shape,
+            .then(
+                if (highlighted) {
+                    Modifier
+                        .background(colors.primaryContainer, RoundedCornerShape(14.dp))
+                        .border(2.dp, colors.primary, RoundedCornerShape(14.dp))
+                } else {
+                    Modifier
+                },
             )
-            .clip(shape)
-            .selectable(
-                selected = model.selected,
-                onClick = onSelect,
-                role = Role.RadioButton,
-            )
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            PreviewStill(
-                jpeg = image,
-                modifier = Modifier
-                    .size(104.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = if (highlighted) FontWeight.Medium else FontWeight.Normal,
+            ),
+            color = if (highlighted) colors.onPrimaryContainer else colors.onSurfaceVariant,
+        )
+        if (highlighted) {
+            Icon(
+                painter = painterResource(R.drawable.ic_check),
+                contentDescription = null,
+                tint = colors.onPrimaryContainer,
+                modifier = Modifier.size(20.dp),
             )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(text = model.name, style = MaterialTheme.typography.titleMedium)
-                if (model.recommended) {
-                    Text(
-                        text = stringResource(R.string.onboarding_recommended),
-                        modifier = Modifier
-                            .background(colors.primary, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 8.dp, vertical = 1.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colors.onPrimary,
-                    )
-                }
+        }
+    }
+}
+
+@Composable
+private fun NumberedStep(number: Int, title: String, body: String? = null) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = number.toString(),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            body?.let {
                 Text(
-                    text = model.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (model.selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
+                    text = it,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .border(
-                        width = 2.dp,
-                        color = if (model.selected) colors.primary else colors.outline,
-                        shape = CircleShape,
-                    )
-                    .background(if (model.selected) colors.primary else Color.Transparent, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (model.selected) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_check),
-                        contentDescription = stringResource(R.string.onboarding_selected),
-                        tint = colors.onPrimary,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
-        }
-        Column(
-            modifier = Modifier.padding(horizontal = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(text = model.previewSize, style = MaterialTheme.typography.bodyMedium)
-            Text(text = model.estimate, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
-private fun PreviewStill(jpeg: PreviewJpeg?, modifier: Modifier = Modifier) {
-    val image by produceState<ImageBitmap?>(initialValue = null, jpeg) {
-        val bytes = jpeg?.bytes
-        value = if (bytes == null) {
-            null
-        } else {
-            withContext(Dispatchers.Default) {
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            }
-        }
-    }
-    val current = image
-    if (current == null) {
-        Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
-    } else {
-        Image(
-            bitmap = current,
+private fun SummaryRow(
+    icon: Int,
+    iconTint: Color,
+    label: String,
+    value: String,
+    action: String?,
+    onAction: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 64.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(icon),
             contentDescription = null,
-            modifier = modifier,
-            contentScale = ContentScale.Crop,
+            tint = iconTint,
+            modifier = Modifier.size(24.dp),
         )
+        Column(modifier = Modifier.weight(1f).padding(vertical = 10.dp)) {
+            Text(text = label, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (action != null) {
+            TextButton(onClick = onAction, modifier = Modifier.heightIn(min = 48.dp)) { Text(action) }
+        }
     }
 }
 
+/** Back arrow and a thin bar on top, the content in the middle, the buttons at the bottom where the thumb is. */
 @Composable
-private fun StepColumn(
+private fun StepFrame(
+    index: Int,
+    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    actions: @Composable ColumnScope.() -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        content = content,
-    )
+            .padding(horizontal = 20.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .padding(end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_back),
+                        contentDescription = stringResource(R.string.onboarding_back),
+                    )
+                }
+            } else {
+                Spacer(Modifier.size(48.dp))
+            }
+            StepProgress(current = index, total = STEP_COUNT, modifier = Modifier.weight(1f))
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(top = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            content = content,
+        )
+        Column(
+            modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            content = actions,
+        )
+    }
 }
 
 @Composable
-private fun StepLabel(step: OnboardingStep) {
-    WrappingText(
-        text = stringResource(
-            R.string.onboarding_step,
-            step.ordinal + 1,
-            OnboardingStep.entries.size,
-        ),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+private fun StepProgress(current: Int, total: Int, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val description = stringResource(R.string.onboarding_step, current + 1, total)
+    Row(
+        modifier = modifier.clearAndSetSemantics { contentDescription = description },
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        repeat(total) { part ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(4.dp)
+                    .background(
+                        if (part <= current) colors.primary else colors.surfaceContainerHighest,
+                        RoundedCornerShape(2.dp),
+                    ),
+            )
+        }
+    }
 }
 
 @Composable
@@ -632,24 +781,26 @@ private fun ScreenTitle(text: String) {
 }
 
 @Composable
-private fun WrappingText(
+internal fun WrappingText(
     text: String,
     style: TextStyle,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
+    textAlign: TextAlign = TextAlign.Unspecified,
 ) {
     Text(
         text = text,
         modifier = modifier.fillMaxWidth(),
         style = style,
         color = color,
+        textAlign = textAlign,
         softWrap = true,
         overflow = TextOverflow.Visible,
     )
 }
 
 @Composable
-private fun BigButton(label: String, onClick: () -> Unit) {
+internal fun BigButton(label: String, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier
@@ -681,21 +832,6 @@ private fun QuietButton(label: String, onClick: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            softWrap = true,
-            overflow = TextOverflow.Visible,
-        )
-    }
-}
-
-@Composable
-private fun BackButton(onBack: () -> Unit) {
-    TextButton(
-        onClick = onBack,
-        modifier = Modifier.heightIn(min = 48.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.onboarding_back),
-            style = MaterialTheme.typography.bodyLarge,
             softWrap = true,
             overflow = TextOverflow.Visible,
         )
@@ -740,19 +876,10 @@ private fun ToneCard(
     }
 }
 
-@Preview(
-    name = "Welcome",
-    showBackground = true,
-    fontScale = 2f,
-    uiMode = Configuration.UI_MODE_NIGHT_YES,
-    widthDp = 360,
-    heightDp = 800,
-)
+@Preview(name = "Welcome", showBackground = true, fontScale = 1.3f, widthDp = 360, heightDp = 800)
 @Composable
-private fun WelcomeLargeTextPreview() {
-    PhotoxpoTheme(darkTheme = true) {
-        WelcomeStep(onGetStarted = {})
-    }
+private fun WelcomePreview() {
+    PhotoxpoTheme { WelcomeStep(onGetStarted = {}) }
 }
 
 @Preview(
@@ -801,51 +928,6 @@ private fun ArchiveDriveLargeTextPreview() {
 }
 
 @Preview(
-    name = "Preview quality",
-    showBackground = true,
-    fontScale = 2f,
-    uiMode = Configuration.UI_MODE_NIGHT_YES,
-    widthDp = 360,
-    heightDp = 800,
-)
-@Composable
-private fun PreviewQualityLargeTextPreview() {
-    val cards = qualityCardModels(
-        selected = PreviewPreset.BALANCED,
-        inputs = mapOf(
-            PreviewPreset.SMALLER to QualityCardInput(
-                previewBytes = 80_000L,
-                projectedBytes = 5L * 1024 * 1024 * 1024,
-            ),
-            PreviewPreset.BALANCED to QualityCardInput(
-                previewBytes = 120_000L,
-                projectedBytes = 6L * 1024 * 1024 * 1024,
-            ),
-            PreviewPreset.SHARPER to QualityCardInput(
-                previewBytes = 260_000L,
-                projectedBytes = 8L * 1024 * 1024 * 1024,
-            ),
-        ),
-        libraryCount = 48_000,
-    )
-    PhotoxpoTheme(darkTheme = true) {
-        PreviewQualityStep(
-            preset = PreviewPreset.BALANCED,
-            usingSample = false,
-            photoName = "IMG_100.jpg",
-            originalBytes = 4L * 1024 * 1024,
-            canTryAnother = true,
-            cards = cards,
-            images = emptyMap(),
-            onPreset = {},
-            onTryAnother = {},
-            onContinue = {},
-            onBack = {},
-        )
-    }
-}
-
-@Preview(
     name = "Ready",
     showBackground = true,
     fontScale = 2f,
@@ -864,6 +946,8 @@ private fun ReadyLargeTextPreview() {
                     preset = PreviewPreset.BALANCED,
                 ),
             ),
+            onChooseDrive = {},
+            onChangePreviews = {},
             onFinish = {},
             onBack = {},
         )

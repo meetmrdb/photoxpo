@@ -101,8 +101,8 @@ class OnboardingCopyTest {
         val withDrive = readyLines(
             ReadySummary(driveChosen = true, preset = PreviewPreset.SHARPER),
         )
-        assertEquals("Archive Drive chosen", withDrive.archiveDrive)
-        assertEquals("Previews Sharper", withDrive.previews)
+        assertEquals("Chosen", withDrive.driveValue)
+        assertEquals("Sharper", withDrive.previewsValue)
         assertEquals("The first backup takes hours and can be paused. You can unplug your drive any time; backup carries on when you plug it back in.", withDrive.note)
         assertEquals("Start backup", withDrive.button)
 
@@ -113,8 +113,8 @@ class OnboardingCopyTest {
                 firstBackupTakesHoursAndCanBePaused = false,
             ),
         )
-        assertEquals("Archive Drive not chosen yet", withoutDrive.archiveDrive)
-        assertEquals("Previews Balanced", withoutDrive.previews)
+        assertEquals("Not chosen yet", withoutDrive.driveValue)
+        assertEquals("Balanced · Recommended", withoutDrive.previewsValue)
         assertNull(withoutDrive.note)
         assertEquals("Open the app", withoutDrive.button)
         assertEquals("Use Smaller", usePresetLabel(PreviewPreset.SMALLER))

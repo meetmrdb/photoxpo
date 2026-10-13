@@ -30,21 +30,42 @@ class OnboardingTest {
         assertEquals(OnboardingStep.ArchiveDrive, state.step)
         state = reduce(state, OnboardingEvent.DriveDeferred)
         state = reduce(state, OnboardingEvent.Next)
-        assertEquals(OnboardingStep.PreviewQuality, state.step)
-
-        state = reduce(state, OnboardingEvent.Next)
         assertEquals(OnboardingStep.Ready, state.step)
         state = reduce(state, OnboardingEvent.Next)
         assertEquals(OnboardingStep.Ready, state.step)
 
-        state = reduce(state, OnboardingEvent.Back)
-        assertEquals(OnboardingStep.PreviewQuality, state.step)
         state = reduce(state, OnboardingEvent.Back)
         assertEquals(OnboardingStep.ArchiveDrive, state.step)
         state = reduce(state, OnboardingEvent.Back)
         assertEquals(OnboardingStep.PhotosAccess, state.step)
         state = reduce(state, OnboardingEvent.Back)
         assertEquals(OnboardingStep.Welcome, state.step)
+    }
+
+    @Test
+    fun theFlowIsFourScreens_andPreviewQualityIsNotOneOfThem() {
+        assertEquals(
+            listOf("Welcome", "PhotosAccess", "ArchiveDrive", "Ready"),
+            OnboardingStep.entries.map { it.name },
+        )
+    }
+
+    @Test
+    fun previewsSheet_opensAndClosesOnReady_andBackClosesItBeforeLeavingTheScreen() {
+        val ready = OnboardingState(step = OnboardingStep.Ready)
+        assertFalse(ready.choosingPreviews)
+
+        val open = reduce(ready, OnboardingEvent.OpenPreviews)
+        assertTrue(open.choosingPreviews)
+        assertEquals(OnboardingStep.Ready, open.step)
+
+        val closed = reduce(open, OnboardingEvent.ClosePreviews)
+        assertFalse(closed.choosingPreviews)
+        assertEquals(OnboardingStep.Ready, closed.step)
+
+        val backed = reduce(open, OnboardingEvent.Back)
+        assertFalse(backed.choosingPreviews)
+        assertEquals(OnboardingStep.Ready, backed.step)
     }
 
     @Test
@@ -55,7 +76,7 @@ class OnboardingTest {
         val deferred = reduce(waiting, OnboardingEvent.DriveDeferred)
         assertTrue(deferred.driveDeferred)
         assertFalse(deferred.driveChosen)
-        assertEquals(OnboardingStep.PreviewQuality, reduce(deferred, OnboardingEvent.Next).step)
+        assertEquals(OnboardingStep.Ready, reduce(deferred, OnboardingEvent.Next).step)
 
         val chosen = reduce(
             OnboardingState(step = OnboardingStep.ArchiveDrive, driveDeferred = true),
@@ -63,14 +84,15 @@ class OnboardingTest {
         )
         assertTrue(chosen.driveChosen)
         assertFalse(chosen.driveDeferred)
-        assertEquals(OnboardingStep.PreviewQuality, reduce(chosen, OnboardingEvent.Next).step)
+        assertEquals(OnboardingStep.Ready, reduce(chosen, OnboardingEvent.Next).step)
     }
 
     @Test
     fun presetChosen_keepsTheStepAndStoresThePreset() {
-        val state = OnboardingState(step = OnboardingStep.PreviewQuality)
+        val state = OnboardingState(step = OnboardingStep.Ready, choosingPreviews = true)
         val next = reduce(state, OnboardingEvent.PresetChosen(PreviewPreset.SHARPER))
-        assertEquals(OnboardingStep.PreviewQuality, next.step)
+        assertEquals(OnboardingStep.Ready, next.step)
+        assertTrue(next.choosingPreviews)
         assertEquals(PreviewPreset.SHARPER, next.preset)
         assertEquals(
             PreviewPreset.SMALLER,

@@ -171,7 +171,7 @@ components:
 
 # Design System: Photoxpo
 
-> **Status: agreed target, not yet shipped.** This file records the design agreed on the Home / Photos / Load and onboarding prototypes (branches `prototype/home-gallery-load`, layout A, and `prototype/onboarding-quality-chooser`). The Build 1 app currently uses the stock Material baseline theme (`ui/theme/Theme.kt`), so none of these tokens are wired in yet. The UI audit tracks that gap. When the theme lands, re-run `/impeccable document` to refresh this file from code.
+> **Status: wired into the app.** The colour, type and shape tokens below are in `ui/theme/Theme.kt`, and Home, Photos, Backup history and onboarding are built to this file (prototypes: `prototype/home-gallery-load`, `prototype/ui-refresh`, `prototype/history-onboarding`). The photo viewer and Load sections have not been re-checked against the shipped screens. Where the code and this file disagree, the code is current; re-run `/impeccable document` to refresh this file from it.
 
 ## Overview
 
@@ -251,6 +251,8 @@ A cool, pale teal-white field with one deep teal accent, warm amber for "waiting
 Single-column phone, compact width. Content padding is 20 dp on Home, 16 dp elsewhere, with 16 dp vertical rhythm between stacked blocks (`stack` gap). Home scrolls: the logo with a small drive status beside it, the headline sentence plus at most one supporting line, one state card (what is waiting, or the progress, pace and warnings of a run), one 56 dp primary button, then one Backup history card that also carries when it last ran and the free space. Photos is the bottom pill's other destination, so Home has no link to it.
 
 The Photos tab is a serif title with a compact Months / Days control, one status strip (how many are on the Archive Drive and how many new ones wait; its drive mark is the legend for the mark on each tile), then a 3-column grid with 3 dp gutters, grouped by sticky serif month headers. Sample a month, never render everything. Backup history is one status strip, a compact By month / By backup control, then one card per month with its Backup runs listed inside as rows.
+
+Onboarding is four screens: Welcome, Photos, Archive Drive, Ready. Each has a back arrow and a thin four-part progress bar on top (never a "Step n of m" label), its content in the middle, and its buttons at the bottom where the thumb is. Welcome opens with the one idea as a picture, the Original going to the drive and a Preview staying on the phone, then one serif sentence. Photos names what is asked for in one card and shows what the system dialog will offer, with Allow all marked. Archive Drive is two numbered rows, plug in then choose its folder. Ready is a two-row summary (Archive Drive, Previews) with a Choose or Change action on each; Preview quality is not a screen but a bottom sheet opened by Change on Previews, with Balanced as the default.
 
 Edge-to-edge with status, navigation and IME insets applied. A floating navigation pill with two destinations (Home, Photos) on compact width; the history screen is a pushed child with a back arrow. On expanded widths, use a navigation rail rather than stretching the phone layout.
 
