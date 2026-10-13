@@ -98,11 +98,11 @@ class BackupSettingsStore(
     override fun checkedOriginal(mediaId: String): CheckedOriginal? {
         val hash = ledger.getString(mediaId, null) ?: return null
         val parts = checks.getString(mediaId, null)?.split('|')
-        if (parts == null || parts.size != 4 || parts[0] != hash) return CheckedOriginal(hash, -1L, -1L, null)
+        if (parts == null || parts.size != 4 || parts[0] != hash) return CheckedOriginal.unknown(hash)
         val size = parts[1].toLongOrNull()
         val modified = parts[2].toLongOrNull()
         val checkedAt = parts[3].toLongOrNull()
-        if (size == null || modified == null || checkedAt == null) return CheckedOriginal(hash, -1L, -1L, null)
+        if (size == null || modified == null || checkedAt == null) return CheckedOriginal.unknown(hash)
         return CheckedOriginal(hash, size, modified, Instant.ofEpochMilli(checkedAt))
     }
 

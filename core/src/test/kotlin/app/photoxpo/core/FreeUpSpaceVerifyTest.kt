@@ -242,7 +242,7 @@ class FreeUpSpaceVerifyTest {
         val ledger: InMemoryBackedUpLedger,
         val files: List<MediaFile>,
     ) {
-        fun freeUp(withLedger: BackedUpLedger = ledger) = FreeUpSpace(source, drive, withLedger, clock)
+        fun freeUp(withLedger: BackedUpLedger = ledger) = FreeUpSpace(source, drive, withLedger)
 
         fun verifyEverything() = VerifyEverything(source, drive, ledger, clock)
     }

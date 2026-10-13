@@ -40,7 +40,7 @@ fun runEndWords(end: RunEnd): String = when (end) {
     is RunEnd.Stopped -> when (end.reason) {
         StopReason.SizeLimit -> "Stopped at the size limit"
         StopReason.TimeLimit -> "Stopped at the time limit"
-        StopReason.LowBattery -> "Paused at 15% battery"
+        StopReason.LowBattery -> "Paused at $LOW_BATTERY_PERCENT% battery"
         StopReason.DriveFull -> "Your Archive Drive is full"
     }
 }

@@ -146,10 +146,10 @@ private fun BatteryExemptionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDecline,
-        title = { Text("Let the Backup run finish") },
+        title = { Text("Let the backup finish") },
         text = {
             Text(
-                "A Backup run can take hours, including while the screen is off. " +
+                "Backing up can take hours, including while the screen is off. " +
                     "Allow Photoxpo under Never sleeping apps so the phone does not stop it.",
             )
         },

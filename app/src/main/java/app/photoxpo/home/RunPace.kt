@@ -5,13 +5,13 @@ import app.photoxpo.backup.BackupUiState
 
 private const val MINUTE_MS = 60_000L
 
-/** How long a run has been going and, once it can be worked out honestly, how long is left. */
+/** How long this backup has been going and, once it can be worked out honestly, how long is left. */
 internal fun runPaceLine(state: BackupUiState, nowEpochMillis: Long): String? {
     if (state.status != BackupStatus.Running) return null
     val started = state.runStartedAtMillis ?: return null
     val elapsed = (nowEpochMillis - started).coerceAtLeast(0L)
     if (elapsed < MINUTE_MS) return null
-    val sofar = "Running for ${formatDuration(elapsed)}"
+    val sofar = "${formatDuration(elapsed)} so far"
     return "$sofar · ${runLeftPhrase(state, nowEpochMillis, elapsed)}"
 }
 
@@ -45,5 +45,5 @@ internal fun formatDuration(millis: Long): String {
 internal fun lastRunLine(state: BackupUiState): String? {
     val took = state.lastRunTookMillis ?: return null
     if (state.status != BackupStatus.Done) return null
-    return "That run took ${formatDuration(took)}"
+    return "Last backup took ${formatDuration(took)}"
 }

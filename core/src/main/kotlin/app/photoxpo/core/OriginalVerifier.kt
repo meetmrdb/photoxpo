@@ -70,7 +70,6 @@ class FreeUpSpace(
     private val mediaSource: MediaSource,
     private val archiveDrive: ArchiveDrive,
     private val backedUpLedger: BackedUpLedger,
-    @Suppress("unused") private val clock: Clock = Clock.systemUTC(),
 ) {
     fun removeVerified(candidates: List<MediaFile>, remove: (MediaFile) -> Unit): FreeUpResult {
         val removed = mutableListOf<MediaFile>()

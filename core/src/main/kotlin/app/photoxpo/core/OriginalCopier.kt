@@ -7,7 +7,8 @@ internal data class FileBackupResult(
     val outcome: BackupItemOutcome,
     val wroteNewFileLine: Boolean,
     val copiedFile: Boolean,
-    val deferredByCap: Boolean,
+    /** Needed a new copy, but the run is stopping, so it waits for the next run. */
+    val deferredByStop: Boolean,
     val hash: String?,
 )
 
@@ -69,7 +70,7 @@ internal class OriginalCopier(
                 outcome = BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
                 wroteNewFileLine = true,
                 copiedFile = false,
-                deferredByCap = false,
+                deferredByStop = false,
                 hash = source.sha256,
             )
         }
@@ -79,7 +80,7 @@ internal class OriginalCopier(
                 outcome = BackupItemOutcome(file.id, file.name, ItemState.FOUND),
                 wroteNewFileLine = false,
                 copiedFile = false,
-                deferredByCap = true,
+                deferredByStop = true,
                 hash = null,
             )
         }
@@ -153,7 +154,7 @@ internal class OriginalCopier(
             outcome = BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
             wroteNewFileLine = true,
             copiedFile = true,
-            deferredByCap = false,
+            deferredByStop = false,
             hash = copied.sha256,
         )
     }
@@ -190,7 +191,7 @@ internal class OriginalCopier(
             outcome = BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
             wroteNewFileLine = true,
             copiedFile = true,
-            deferredByCap = false,
+            deferredByStop = false,
             hash = copied.sha256,
         )
     }
@@ -210,8 +211,9 @@ internal class OriginalCopier(
                 }
             }
         } catch (full: DriveFullException) {
-            // No half-copied Original is left on the Archive Drive.
-            runCatching { archiveDrive.delete(partPath) }
+            // No half-copied Original is left on the Archive Drive. Try twice; if it still cannot be
+            // removed, surface that instead of a quiet DriveFull, so a stuck part is not unnoticed.
+            deletePartAfterDriveFull(partPath, full)
             throw full
         }
         val readBack = archiveDrive.read(partPath).use { input ->
@@ -227,6 +229,21 @@ internal class OriginalCopier(
             return null
         }
         return copied
+    }
+
+    private fun deletePartAfterDriveFull(partPath: String, full: DriveFullException) {
+        var failure: Exception? = null
+        repeat(2) {
+            try {
+                archiveDrive.delete(partPath)
+                return
+            } catch (error: Exception) {
+                failure = error
+            }
+        }
+        val stuck = java.io.IOException("Could not remove the half-copied file $partPath", failure)
+        stuck.addSuppressed(full)
+        throw stuck
     }
 
     private fun hashSource(file: MediaFile): HashedCopy {
@@ -255,7 +272,7 @@ internal class OriginalCopier(
             outcome = BackupItemOutcome(file.id, file.name, ItemState.COMMITTED),
             wroteNewFileLine = false,
             copiedFile = false,
-            deferredByCap = false,
+            deferredByStop = false,
             hash = hash,
         )
     }
@@ -265,7 +282,7 @@ internal class OriginalCopier(
             outcome = BackupItemOutcome(file.id, file.name, ItemState.NEEDS_ATTENTION),
             wroteNewFileLine = false,
             copiedFile = copiedFile,
-            deferredByCap = false,
+            deferredByStop = false,
             hash = null,
         )
     }

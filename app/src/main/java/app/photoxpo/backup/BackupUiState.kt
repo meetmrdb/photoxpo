@@ -12,7 +12,7 @@ import app.photoxpo.onboarding.classifyMediaAccess
 
 const val MESSAGE_DRIVE_OUT = "Archive Drive disconnected."
 
-const val MESSAGE_PAUSED_USER = "Backup run paused."
+const val MESSAGE_PAUSED_USER = "Backup paused."
 
 const val MESSAGE_DRIVE_MISMATCH = "This Archive Drive is not the one this phone remembers."
 

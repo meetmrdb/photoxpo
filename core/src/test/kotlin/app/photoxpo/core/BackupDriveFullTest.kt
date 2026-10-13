@@ -41,6 +41,52 @@ class BackupDriveFullTest {
         assertTrue("leftover parts: $parts", parts.isEmpty())
     }
 
+    @Test
+    fun partDeleteThatFailsOnce_isRetried_andTheRunStillEndsDriveFullWithNoPart() {
+        val root = folders.newFolder("retry").toPath()
+        val files = (1..4).map { sample(it, size = 1_000) }
+        val real = FakeArchiveDrive(root, capacityBytes = 2_000 + 1_500)
+        val flaky = FlakyPartDelete(real, failures = 1)
+        val result = BackupRunner(
+            mediaSource = FakeMediaSource(files.map { it.file to it.bytes }),
+            archiveDrive = flaky,
+            clock = Clock.fixed(START, ZoneOffset.UTC),
+        ).start()
+
+        assertEquals(StopReason.DriveFull, result.stopReason)
+        val parts = Files.walk(root).use { s ->
+            s.filter { it.fileName?.toString()?.endsWith(".photoxpo-part") == true }.toList()
+        }
+        assertTrue("leftover parts: $parts", parts.isEmpty())
+    }
+
+    @Test
+    fun partDeleteThatKeepsFailing_isSurfaced_notSwallowed() {
+        val root = folders.newFolder("stuck").toPath()
+        val files = (1..4).map { sample(it, size = 1_000) }
+        val flaky = FlakyPartDelete(FakeArchiveDrive(root, capacityBytes = 2_000 + 1_500), failures = 100)
+        val error = runCatching {
+            BackupRunner(
+                mediaSource = FakeMediaSource(files.map { it.file to it.bytes }),
+                archiveDrive = flaky,
+                clock = Clock.fixed(START, ZoneOffset.UTC),
+            ).start()
+        }.exceptionOrNull()
+
+        assertTrue("expected the failure to surface, got $error", error != null && error !is DriveFullException)
+        assertTrue(error!!.suppressed.any { it is DriveFullException })
+    }
+
+    private class FlakyPartDelete(private val inner: ArchiveDrive, private var failures: Int) : ArchiveDrive by inner {
+        override fun delete(path: String) {
+            if (path.endsWith(".photoxpo-part") && failures > 0) {
+                failures -= 1
+                throw java.io.IOException("cannot delete")
+            }
+            inner.delete(path)
+        }
+    }
+
     private fun sample(index: Int, size: Int): Sample {
         val bytes = ByteArray(size) { (index * 31 + it).toByte() }
         val name = "IMG_000$index.jpg"

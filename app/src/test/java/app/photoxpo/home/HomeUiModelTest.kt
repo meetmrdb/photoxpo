@@ -84,7 +84,7 @@ class HomeUiModelTest {
             ),
             NOW,
         )
-        assertEquals("Backup run paused", model.statusSentence)
+        assertEquals("Backup paused", model.statusSentence)
         assertEquals("Back up", model.primaryLabel)
         assertFalse(model.primaryPauses)
         assertEquals("Backed up 4 of 10", model.progressText)
@@ -187,8 +187,7 @@ class HomeUiModelTest {
             NOW,
             locale = java.util.Locale.US,
         )
-        assertEquals("3,660 files left", model.filesLeftLine)
-        assertEquals("340 photos backed up", model.statusSentence)
+        assertEquals("Time limit reached. 3,660 files left.", model.statusSentence)
         assertEquals("Backed up 340 of 4000", model.progressText)
         assertEquals("Back up more", model.primaryLabel)
         assertTrue(model.showProgress)
@@ -212,7 +211,7 @@ class HomeUiModelTest {
         )
         assertEquals(
             "Paused at 15% battery. 3,660 files left. Charge, then reconnect your drive.",
-            model.filesLeftLine,
+            model.statusSentence,
         )
         assertEquals("Back up more", model.primaryLabel)
         assertNull(model.offlineBanner)
@@ -226,8 +225,11 @@ class HomeUiModelTest {
             NOW,
             locale = java.util.Locale.US,
         )
-        assertEquals("1 file left", one.filesLeftLine)
-        assertNull(homeUiModel(base(status = BackupStatus.Done, backedUpCount = 4, totalCount = 4), NOW).filesLeftLine)
+        assertEquals("Time limit reached. 1 file left.", one.statusSentence)
+        assertEquals(
+            "4 photos backed up",
+            homeUiModel(base(status = BackupStatus.Done, backedUpCount = 4, totalCount = 4), NOW).statusSentence,
+        )
     }
 
     @Test

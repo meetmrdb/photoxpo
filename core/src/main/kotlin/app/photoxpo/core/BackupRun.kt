@@ -68,6 +68,12 @@ class BackupRunner(
     private val batteryInput: BatteryInput = BatteryInput { null },
     private val previewPreset: PreviewPreset? = null,
     private val isCancelled: () -> Boolean = { false },
+    /**
+     * A stop asked for from outside the run, for example Android's time limit on the foreground service.
+     * Null means keep going. Checked before each new copy like the [stopPolicy], so the current Original
+     * always finishes and the run ends as a normal stop with files left.
+     */
+    private val externalStop: () -> StopReason? = { null },
     private val checkPolicy: CheckPolicy = CheckPolicy.skipRecentlyChecked(),
 ) {
     fun start(): BackupRunResult {
@@ -134,7 +140,7 @@ class BackupRunner(
                     continue
                 }
                 // Once the run decides to stop, it only finishes Originals that need no new copy.
-                val reasonNow = stopReason ?: run {
+                val reasonNow = stopReason ?: externalStop() ?: run {
                     val battery = batteryInput.read()
                     if (batteryAtStart == null) batteryAtStart = battery
                     stopPolicy.reasonToStop(
@@ -155,7 +161,7 @@ class BackupRunner(
                     deferred += file.id
                     continue
                 }
-                if (copied.deferredByCap) {
+                if (copied.deferredByStop) {
                     stopReason = reasonNow
                     deferred += file.id
                     continue

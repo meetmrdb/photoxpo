@@ -147,6 +147,53 @@ class BackupStopPolicyTest {
     }
 
     @Test
+    fun externalStopRequest_endsTheRunAfterTheCurrentFile_withTimeLimitFilesLeftAndFooter() {
+        val root = folders.newFolder("external").toPath()
+        val drive = FakeArchiveDrive(root)
+        val files = (1..5).map { sample(it, size = 4) }
+        var requested = false
+        val result = BackupRunner(
+            mediaSource = FakeMediaSource(files.map { it.file to it.bytes }),
+            archiveDrive = drive,
+            clock = Clock.fixed(START, ZoneOffset.UTC),
+            // Android asks for the stop while the second Original is being copied.
+            backedUpLedger = object : BackedUpLedger {
+                override fun record(mediaId: String, hash: String) {
+                    if (mediaId == "media-2") requested = true
+                }
+
+                override fun clear() = Unit
+            },
+            externalStop = { if (requested) StopReason.TimeLimit else null },
+        ).start()
+
+        assertEquals(BackupRunStatus.Completed, result.status)
+        assertEquals(StopReason.TimeLimit, result.stopReason)
+        assertEquals(3, result.filesLeft)
+        assertEquals(2, result.items.count { it.state == ItemState.COMMITTED })
+        assertTrue(drive.exists(files[1].path))
+        assertFalse(drive.exists(files[2].path))
+        assertTrue(drive.readText(result.manifestPath).contains("\"stopReason\":\"time-limit\""))
+        assertNoPartFiles(root)
+    }
+
+    @Test
+    fun noExternalStop_changesNothing() {
+        val root = folders.newFolder("noexternal").toPath()
+        val drive = FakeArchiveDrive(root)
+        val files = (1..3).map { sample(it, size = 4) }
+        val result = BackupRunner(
+            mediaSource = FakeMediaSource(files.map { it.file to it.bytes }),
+            archiveDrive = drive,
+            clock = Clock.fixed(START, ZoneOffset.UTC),
+            externalStop = { null },
+        ).start()
+
+        assertNull(result.stopReason)
+        assertTrue(files.all { drive.exists(it.path) })
+    }
+
+    @Test
     fun lowBatteryConstant_isFifteenPercent() {
         assertEquals(15, LOW_BATTERY_PERCENT)
     }
