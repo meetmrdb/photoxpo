@@ -1,0 +1,143 @@
+package app.photoxpo.backup
+
+import android.content.Context
+import android.net.Uri
+import app.photoxpo.core.BackedUpLedger
+import app.photoxpo.core.CheckedOriginal
+import app.photoxpo.core.DriveIdentityStore
+import app.photoxpo.core.MediaFile
+import app.photoxpo.core.PreviewPreset
+import java.time.Instant
+
+/** When the phone last read Backup history from the Archive Drive. */
+interface LastArchiveDriveConnection {
+    fun lastConnectedAtEpochMillis(): Long?
+
+    fun setLastConnectedAtEpochMillis(epochMillis: Long)
+}
+
+/**
+ * Phone-side memory for the Archive Drive: expected drive id, Backed up hashes,
+ * last Backed up time, the last time the Archive Drive was connected, chosen tree,
+ * onboarding, and Preview preset.
+ */
+class BackupSettingsStore(
+    context: Context,
+) : DriveIdentityStore, BackedUpLedger, LastArchiveDriveConnection {
+    private val settings = context.applicationContext.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+    private val ledger = context.applicationContext.getSharedPreferences(LEDGER_PREFS, Context.MODE_PRIVATE)
+    private val checks = context.applicationContext.getSharedPreferences(CHECKS_PREFS, Context.MODE_PRIVATE)
+
+    fun onboardingDone(): Boolean = settings.getBoolean(KEY_ONBOARDING_DONE, false)
+
+    fun setOnboardingDone(done: Boolean) {
+        settings.edit().putBoolean(KEY_ONBOARDING_DONE, done).commit()
+    }
+
+    fun previewPreset(): PreviewPreset {
+        val stored = settings.getString(KEY_PREVIEW_PRESET, null) ?: return PreviewPreset.BALANCED
+        return try {
+            PreviewPreset.valueOf(stored)
+        } catch (_: IllegalArgumentException) {
+            PreviewPreset.BALANCED
+        }
+    }
+
+    fun setPreviewPreset(preset: PreviewPreset) {
+        settings.edit().putString(KEY_PREVIEW_PRESET, preset.name).commit()
+    }
+
+    fun treeUri(): Uri? {
+        val raw = settings.getString(KEY_TREE_URI, null) ?: return null
+        return Uri.parse(raw)
+    }
+
+    fun setTreeUri(uri: Uri) {
+        settings.edit().putString(KEY_TREE_URI, uri.toString()).commit()
+    }
+
+    fun lastBackedUpAtEpochMillis(): Long? {
+        if (!settings.contains(KEY_LAST_BACKED_UP_AT)) return null
+        return settings.getLong(KEY_LAST_BACKED_UP_AT, 0L)
+    }
+
+    fun setLastBackedUpAtEpochMillis(epochMillis: Long) {
+        settings.edit().putLong(KEY_LAST_BACKED_UP_AT, epochMillis).commit()
+    }
+
+    override fun lastConnectedAtEpochMillis(): Long? {
+        if (!settings.contains(KEY_LAST_CONNECTED_AT)) return null
+        return settings.getLong(KEY_LAST_CONNECTED_AT, 0L)
+    }
+
+    override fun setLastConnectedAtEpochMillis(epochMillis: Long) {
+        settings.edit().putLong(KEY_LAST_CONNECTED_AT, epochMillis).commit()
+    }
+
+    override fun expected(): String? {
+        val id = settings.getString(KEY_DRIVE_ID, null)?.trim()
+        return id?.ifEmpty { null }
+    }
+
+    override fun remember(id: String) {
+        settings.edit().putString(KEY_DRIVE_ID, id.trim()).commit()
+    }
+
+    override fun record(mediaId: String, hash: String) {
+        ledger.edit().putString(mediaId, hash).commit()
+    }
+
+    override fun recordChecked(file: MediaFile, hash: String, checkedAt: Instant) {
+        record(file.id, hash)
+        checks.edit()
+            .putString(file.id, "$hash|${file.sizeBytes}|${file.modifiedAtEpochMillis}|${checkedAt.toEpochMilli()}")
+            .commit()
+    }
+
+    /** Older records have a hash but no check time; they come back with a null [CheckedOriginal.checkedAt]. */
+    override fun checkedOriginal(mediaId: String): CheckedOriginal? {
+        val hash = ledger.getString(mediaId, null) ?: return null
+        val parts = checks.getString(mediaId, null)?.split('|')
+        if (parts == null || parts.size != 4 || parts[0] != hash) return CheckedOriginal.unknown(hash)
+        val size = parts[1].toLongOrNull()
+        val modified = parts[2].toLongOrNull()
+        val checkedAt = parts[3].toLongOrNull()
+        if (size == null || modified == null || checkedAt == null) return CheckedOriginal.unknown(hash)
+        return CheckedOriginal(hash, size, modified, Instant.ofEpochMilli(checkedAt))
+    }
+
+    fun hasRecorded(mediaId: String): Boolean = ledger.contains(mediaId)
+
+    /**
+     * Android kills an app that holds a file open on a drive that was pulled, so a run can end without
+     * any code of ours running. This marker survives that, and the next start reads it.
+     */
+    fun setRunActive(active: Boolean) {
+        settings.edit().putBoolean(KEY_RUN_ACTIVE, active).commit()
+    }
+
+    fun runWasCutOff(): Boolean = settings.getBoolean(KEY_RUN_ACTIVE, false)
+
+    override fun clear() {
+        ledger.edit().clear().commit()
+        checks.edit().clear().commit()
+    }
+
+    /** Backed up Originals this phone knows about: MediaStore id to SHA-256. The drive wins; this is a cache. */
+    fun ledgerEntries(): Map<String, String> {
+        return ledger.all.mapNotNull { (mediaId, hash) -> (hash as? String)?.let { mediaId to it } }.toMap()
+    }
+
+    private companion object {
+        const val SETTINGS_PREFS = "photoxpo.backup"
+        const val LEDGER_PREFS = "photoxpo.backed-up"
+        const val CHECKS_PREFS = "photoxpo.checked-at"
+        const val KEY_LAST_BACKED_UP_AT = "lastBackedUpAtEpochMillis"
+        const val KEY_LAST_CONNECTED_AT = "lastConnectedAtEpochMillis"
+        const val KEY_DRIVE_ID = "expectedDriveId"
+        const val KEY_TREE_URI = "treeUri"
+        const val KEY_ONBOARDING_DONE = "onboardingDone"
+        const val KEY_RUN_ACTIVE = "runActive"
+        const val KEY_PREVIEW_PRESET = "previewPreset"
+    }
+}
