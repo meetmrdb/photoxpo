@@ -19,7 +19,7 @@ interface LastArchiveDriveConnection {
 /**
  * Phone-side memory for the Archive Drive: expected drive id, Backed up hashes,
  * last Backed up time, the last time the Archive Drive was connected, chosen tree,
- * file cap, onboarding, and Preview preset.
+ * onboarding, and Preview preset.
  */
 class BackupSettingsStore(
     context: Context,
@@ -27,16 +27,6 @@ class BackupSettingsStore(
     private val settings = context.applicationContext.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
     private val ledger = context.applicationContext.getSharedPreferences(LEDGER_PREFS, Context.MODE_PRIVATE)
     private val checks = context.applicationContext.getSharedPreferences(CHECKS_PREFS, Context.MODE_PRIVATE)
-
-    fun fileCap(): Int {
-        val stored = settings.getInt(KEY_FILE_CAP, DEFAULT_FILE_CAP)
-        return if (stored < 1) DEFAULT_FILE_CAP else stored
-    }
-
-    fun setFileCap(fileCap: Int) {
-        val stored = if (fileCap < 1) DEFAULT_FILE_CAP else fileCap
-        settings.edit().putInt(KEY_FILE_CAP, stored).commit()
-    }
 
     fun onboardingDone(): Boolean = settings.getBoolean(KEY_ONBOARDING_DONE, false)
 
@@ -146,7 +136,6 @@ class BackupSettingsStore(
         const val KEY_LAST_CONNECTED_AT = "lastConnectedAtEpochMillis"
         const val KEY_DRIVE_ID = "expectedDriveId"
         const val KEY_TREE_URI = "treeUri"
-        const val KEY_FILE_CAP = "fileCap"
         const val KEY_ONBOARDING_DONE = "onboardingDone"
         const val KEY_RUN_ACTIVE = "runActive"
         const val KEY_PREVIEW_PRESET = "previewPreset"

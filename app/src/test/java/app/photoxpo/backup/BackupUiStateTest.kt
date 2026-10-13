@@ -4,6 +4,7 @@ import app.photoxpo.core.BackupItemOutcome
 import app.photoxpo.core.BackupRunResult
 import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.ItemState
+import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -11,20 +12,19 @@ import org.junit.Test
 
 class BackupUiStateTest {
     @Test
-    fun freshState_isIdleWithDefaultFileCap() {
+    fun freshState_isIdle() {
         val state = BackupUiState()
         assertEquals(BackupStatus.Idle, state.status)
         assertEquals(0, state.backedUpCount)
         assertEquals(0, state.totalCount)
         assertNull(state.lastBackedUpAtEpochMillis)
         assertEquals(DriveStatus.Absent, state.driveStatus)
-        assertEquals(200, state.fileCap)
         assertNull(state.message)
     }
 
     @Test
     fun completedRun_isDoneAndRecordsWhenItWasBackedUp() {
-        val previous = BackupUiState(fileCap = 200, driveStatus = DriveStatus.Ready, totalCount = 2)
+        val previous = BackupUiState(driveStatus = DriveStatus.Ready, totalCount = 2)
         val next = reduceBackupRun(
             state = previous,
             result = result(
@@ -39,7 +39,6 @@ class BackupUiStateTest {
         assertEquals(2, next.totalCount)
         assertEquals(50L, next.lastBackedUpAtEpochMillis)
         assertEquals(DriveStatus.Ready, next.driveStatus)
-        assertEquals(200, next.fileCap)
         assertNull(next.message)
     }
 
@@ -64,7 +63,7 @@ class BackupUiStateTest {
     @Test
     fun pausedByUser_countsOnlyBackedUpOriginals() {
         val next = reduceBackupRun(
-            state = BackupUiState(totalCount = 3, fileCap = 200, driveStatus = DriveStatus.Ready),
+            state = BackupUiState(totalCount = 3, driveStatus = DriveStatus.Ready),
             result = result(
                 BackupRunStatus.Paused,
                 item("a", ItemState.COMMITTED),
@@ -106,7 +105,6 @@ class BackupUiStateTest {
             totalCount = 10,
             lastBackedUpAtEpochMillis = 3L,
             driveStatus = DriveStatus.Ready,
-            fileCap = 200,
         )
         val next = reduceBackupRun(
             state = previous,
@@ -131,11 +129,10 @@ class BackupUiStateTest {
             message = MESSAGE_CONNECTED_DEVICE_FALLBACK,
             backedUpCount = 5,
             lastBackedUpAtEpochMillis = 7L,
-        ).runStarted(totalCount = 12, fileCap = 50, driveStatus = DriveStatus.Ready)
+        ).runStarted(totalCount = 12, driveStatus = DriveStatus.Ready)
         assertEquals(BackupStatus.Running, started.status)
         assertEquals(0, started.backedUpCount)
         assertEquals(12, started.totalCount)
-        assertEquals(50, started.fileCap)
         assertEquals(DriveStatus.Ready, started.driveStatus)
         assertEquals(7L, started.lastBackedUpAtEpochMillis)
         assertEquals(MESSAGE_CONNECTED_DEVICE_FALLBACK, started.message)
@@ -148,6 +145,34 @@ class BackupUiStateTest {
         assertEquals(3, running.backedUpCount)
         val paused = BackupUiState(status = BackupStatus.Paused(PauseReason.User), backedUpCount = 1)
         assertEquals(1, paused.withBackedUpCount(9).backedUpCount)
+    }
+
+    @Test
+    fun runStoppedAtALimit_isDoneWithFilesLeft_notAnErrorOrAMessage() {
+        val next = reduceBackupRun(
+            state = BackupUiState(totalCount = 5, driveStatus = DriveStatus.Ready),
+            result = BackupRunResult(
+                manifestPath = "Photoxpo/.photoxpo/runs/run.jsonl",
+                items = listOf(item("a", ItemState.COMMITTED), item("b", ItemState.COMMITTED)),
+                status = BackupRunStatus.Completed,
+                stopReason = StopReason.SizeLimit,
+                filesLeft = 3,
+            ),
+            nowEpochMillis = 50L,
+        )
+        assertEquals(BackupStatus.Done, next.status)
+        assertEquals(StopReason.SizeLimit, next.stopReason)
+        assertEquals(3, next.filesLeft)
+        assertNull(next.message)
+        assertEquals(50L, next.lastBackedUpAtEpochMillis)
+    }
+
+    @Test
+    fun nextRunStarting_clearsTheStop() {
+        val started = BackupUiState(stopReason = StopReason.TimeLimit, filesLeft = 9)
+            .runStarted(totalCount = 9, driveStatus = DriveStatus.Ready)
+        assertNull(started.stopReason)
+        assertEquals(0, started.filesLeft)
     }
 
     private fun result(status: BackupRunStatus, vararg items: BackupItemOutcome): BackupRunResult {
