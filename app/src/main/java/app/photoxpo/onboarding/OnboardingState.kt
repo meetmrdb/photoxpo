@@ -6,7 +6,6 @@ enum class OnboardingStep {
     Welcome,
     PhotosAccess,
     ArchiveDrive,
-    PreviewQuality,
     Ready,
 }
 
@@ -15,6 +14,8 @@ data class OnboardingState(
     val driveChosen: Boolean = false,
     val driveDeferred: Boolean = false,
     val preset: PreviewPreset = PreviewPreset.BALANCED,
+    /** The Preview quality sheet is open over the Ready screen. Balanced stands unless the person changes it. */
+    val choosingPreviews: Boolean = false,
 )
 
 sealed interface OnboardingEvent {
@@ -28,6 +29,11 @@ sealed interface OnboardingEvent {
     data object DriveDeferred : OnboardingEvent
 
     data class PresetChosen(val preset: PreviewPreset) : OnboardingEvent
+
+    /** "Change" on the Ready screen. */
+    data object OpenPreviews : OnboardingEvent
+
+    data object ClosePreviews : OnboardingEvent
 }
 
 fun reduce(state: OnboardingState, event: OnboardingEvent): OnboardingState {
@@ -39,10 +45,13 @@ fun reduce(state: OnboardingState, event: OnboardingEvent): OnboardingState {
                 state.copy(step = state.step.shift(1))
             }
         }
-        OnboardingEvent.Back -> state.copy(step = state.step.shift(-1))
+        OnboardingEvent.Back ->
+            if (state.choosingPreviews) state.copy(choosingPreviews = false) else state.copy(step = state.step.shift(-1))
         OnboardingEvent.DriveChosen -> state.copy(driveChosen = true, driveDeferred = false)
         OnboardingEvent.DriveDeferred -> state.copy(driveDeferred = true, driveChosen = false)
         is OnboardingEvent.PresetChosen -> state.copy(preset = event.preset)
+        OnboardingEvent.OpenPreviews -> state.copy(choosingPreviews = true)
+        OnboardingEvent.ClosePreviews -> state.copy(choosingPreviews = false)
     }
 }
 

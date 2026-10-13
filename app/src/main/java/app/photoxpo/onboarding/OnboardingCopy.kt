@@ -113,29 +113,29 @@ fun estimateLabel(input: QualityCardInput, libraryCount: Int): String {
 }
 
 data class ReadyLines(
-    val archiveDrive: String,
-    val previews: String,
+    /** "Chosen" or "Not chosen yet", beside the Archive Drive row. */
+    val driveValue: String,
+    /** The Preview quality, e.g. "Balanced · Recommended", beside the Previews row. */
+    val previewsValue: String,
     val note: String?,
     val button: String,
 )
 
 fun readyLines(summary: ReadySummary): ReadyLines {
-    val drive = if (summary.driveChosen) {
-        "Archive Drive chosen"
-    } else {
-        "Archive Drive not chosen yet"
-    }
     val note = if (summary.firstBackupTakesHoursAndCanBePaused) {
         "The first backup takes hours and can be paused. You can unplug your drive any time; backup carries on when you plug it back in."
     } else {
         null
     }
-    val button = if (summary.driveChosen) "Start backup" else "Open the app"
     return ReadyLines(
-        archiveDrive = drive,
-        previews = "Previews ${presetName(summary.preset)}",
+        driveValue = if (summary.driveChosen) "Chosen" else "Not chosen yet",
+        previewsValue = if (summary.preset == PreviewPreset.BALANCED) {
+            "${presetName(summary.preset)} · Recommended"
+        } else {
+            presetName(summary.preset)
+        },
         note = note,
-        button = button,
+        button = if (summary.driveChosen) "Start backup" else "Open the app",
     )
 }
 

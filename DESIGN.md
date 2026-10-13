@@ -252,6 +252,8 @@ Single-column phone, compact width. Content padding is 20 dp on Home, 16 dp else
 
 The Photos tab is a serif title with a compact Months / Days control, one status strip (how many are on the Archive Drive and how many new ones wait; its drive mark is the legend for the mark on each tile), then a 3-column grid with 3 dp gutters, grouped by sticky serif month headers. Sample a month, never render everything. History is a list of 88 dp month rows, each with a 4-photo thumbnail strip, month, count, and a state pill.
 
+Onboarding is four screens: Welcome, Photos, Archive Drive, Ready. Each has a back arrow and a thin four-part progress bar on top (never a "Step n of m" label), its content in the middle, and its buttons at the bottom where the thumb is. Welcome opens with the one idea as a picture, the Original going to the drive and a Preview staying on the phone, then one serif sentence. Photos names what is asked for in one card and shows what the system dialog will offer, with Allow all marked. Archive Drive is two numbered rows, plug in then choose its folder. Ready is a two-row summary (Archive Drive, Previews) with a Choose or Change action on each; Preview quality is not a screen but a bottom sheet opened by Change on Previews, with Balanced as the default.
+
 Edge-to-edge with status, navigation and IME insets applied. A floating navigation pill with two destinations (Home, Photos) on compact width; the history screen is a pushed child with a back arrow. On expanded widths, use a navigation rail rather than stretching the phone layout.
 
 ### Named Rules
