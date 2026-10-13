@@ -23,6 +23,8 @@ data class BackupRunSummary(
     val elapsedMs: Long?,
     val mbPerSecond: Double?,
     val interrupted: Boolean,
+    /** How the run ended, from the footer; null for older footers without a reason and for interrupted runs. */
+    val runEnd: RunEnd? = null,
 )
 
 /**

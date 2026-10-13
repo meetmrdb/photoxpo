@@ -68,6 +68,7 @@ private fun summary(runFile: String, text: String): BackupRunSummary? {
         elapsedMs = if (interrupted) null else footer?.elapsedMs,
         mbPerSecond = if (interrupted) null else footer?.mbPerSecond,
         interrupted = interrupted,
+        runEnd = if (interrupted) null else footer?.runEnd,
     )
 }
 
@@ -77,6 +78,7 @@ private data class FooterFields(
     val checked: Boolean,
     val elapsedMs: Long?,
     val mbPerSecond: Double?,
+    val runEnd: RunEnd?,
 )
 
 /**
@@ -123,6 +125,7 @@ private fun Map<String, RunJsonField>.toFooter(): FooterFields {
         checked = bool("checked") == true,
         elapsedMs = long("elapsedMs"),
         mbPerSecond = double("mbPerSecond"),
+        runEnd = RunEnd.fromWire(text("stopReason")),
     )
 }
 
