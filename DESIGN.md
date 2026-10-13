@@ -171,7 +171,7 @@ components:
 
 # Design System: Photoxpo
 
-> **Status: agreed target, not yet shipped.** This file records the design agreed on the Home / Photos / Load and onboarding prototypes (branches `prototype/home-gallery-load`, layout A, and `prototype/onboarding-quality-chooser`). The Build 1 app currently uses the stock Material baseline theme (`ui/theme/Theme.kt`), so none of these tokens are wired in yet. The UI audit tracks that gap. When the theme lands, re-run `/impeccable document` to refresh this file from code.
+> **Status: wired into the app.** The colour, type and shape tokens below are in `ui/theme/Theme.kt`, and Home, Photos, Backup history and onboarding are built to this file (prototypes: `prototype/home-gallery-load`, `prototype/ui-refresh`, `prototype/history-onboarding`). The photo viewer and Load sections have not been re-checked against the shipped screens. Where the code and this file disagree, the code is current; re-run `/impeccable document` to refresh this file from it.
 
 ## Overview
 
