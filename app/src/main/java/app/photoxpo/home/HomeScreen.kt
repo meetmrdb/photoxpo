@@ -156,6 +156,13 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                model.filesLeftLine?.let { left ->
+                    Text(
+                        text = left,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 model.paceLine?.let { pace ->
                     Text(
                         text = pace,
@@ -408,7 +415,6 @@ private fun previewOffline(): HomeUiModel {
             totalCount = 1346,
             lastBackedUpAtEpochMillis = 1_000L,
             driveStatus = DriveStatus.Absent,
-            fileCap = 200,
         ),
         nowEpochMillis = 1_000L + 3 * 60 * 60 * 1000L,
     )
@@ -422,7 +428,6 @@ private fun previewRunning(): HomeUiModel {
             totalCount = 200,
             lastBackedUpAtEpochMillis = 5_000L,
             driveStatus = DriveStatus.Ready,
-            fileCap = 200,
         ),
         nowEpochMillis = 5_000L + 60_000L,
     )

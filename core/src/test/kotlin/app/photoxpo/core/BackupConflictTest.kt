@@ -338,7 +338,7 @@ class BackupConflictTest {
     }
 
     @Test
-    fun fileCap_copiesAtMostTheCap_oldestCaptureDateFirst() {
+    fun stopPolicy_copiesAtMostTheLimit_oldestCaptureDateFirst() {
         val root = folders.newFolder("cap").toPath()
         val already = photo(
             id = "A",
@@ -391,7 +391,7 @@ class BackupConflictTest {
             clock = fixed("2026-10-11T19:00:00Z"),
             driveIdentity = identity,
             newDriveId = { "drive-cap" },
-            fileCap = 2,
+            stopPolicy = DefaultStopPolicy(maxCopiedBytes = 2),
         )
 
         assertEquals(BackupRunStatus.Completed, result.status)

@@ -5,6 +5,7 @@ import app.photoxpo.backup.BackupUiState
 import app.photoxpo.backup.PauseReason
 import app.photoxpo.backup.SessionAccess
 import app.photoxpo.backup.sessionAccessBlock
+import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.onboarding.MediaAccessState
 import app.photoxpo.onboarding.accessWarning
@@ -19,11 +20,11 @@ class HomeUiModelTest {
     @Test
     fun idle_saysHowManyPhotosAreBackedUp_andOffersTheFileCap() {
         val model = homeUiModel(
-            state = base(status = BackupStatus.Idle, backedUpCount = 12, fileCap = 200),
+            state = base(status = BackupStatus.Idle, backedUpCount = 12),
             nowEpochMillis = NOW,
         )
         assertEquals("12 photos backed up", model.statusSentence)
-        assertEquals("Back up 200 files", model.primaryLabel)
+        assertEquals("Back up", model.primaryLabel)
         assertFalse(model.primaryPauses)
         assertEquals("Backed up 12", model.progressText)
         assertNull(model.progressFraction)
@@ -33,7 +34,7 @@ class HomeUiModelTest {
     fun idleWithNothingBackedUp_saysNoneYet() {
         val model = homeUiModel(state = base(backedUpCount = 0), nowEpochMillis = NOW)
         assertEquals("No photos backed up yet", model.statusSentence)
-        assertEquals("Back up 1 file", homeUiModel(base(fileCap = 1), NOW).primaryLabel)
+        assertEquals("Back up", homeUiModel(base(), NOW).primaryLabel)
     }
 
     @Test
@@ -51,7 +52,6 @@ class HomeUiModelTest {
                 status = BackupStatus.Running,
                 backedUpCount = 48,
                 totalCount = 200,
-                fileCap = 200,
             ),
             NOW,
         )
@@ -75,18 +75,17 @@ class HomeUiModelTest {
     }
 
     @Test
-    fun pausedByThePerson_offersTheFileCapAgain() {
+    fun pausedByThePerson_offersToBackUpAgain() {
         val model = homeUiModel(
             base(
                 status = BackupStatus.Paused(PauseReason.User),
                 backedUpCount = 4,
                 totalCount = 10,
-                fileCap = 50,
             ),
             NOW,
         )
         assertEquals("Backup run paused", model.statusSentence)
-        assertEquals("Back up 50 files", model.primaryLabel)
+        assertEquals("Back up", model.primaryLabel)
         assertFalse(model.primaryPauses)
         assertEquals("Backed up 4 of 10", model.progressText)
         assertEquals(0.4f, model.progressFraction!!, 0.0001f)
@@ -104,7 +103,7 @@ class HomeUiModelTest {
             NOW,
         )
         assertEquals("Your Archive Drive is not connected", model.statusSentence)
-        assertEquals("Back up 200 files", model.primaryLabel)
+        assertEquals("Back up", model.primaryLabel)
         assertNotNull(model.offlineBanner)
         assertEquals("Your Archive Drive is not connected", model.offlineBanner!!.message)
     }
@@ -161,21 +160,52 @@ class HomeUiModelTest {
     }
 
     @Test
-    fun done_offersAnotherCappedRun() {
+    fun done_offersAnotherRun() {
         val model = homeUiModel(
             base(
                 status = BackupStatus.Done,
                 backedUpCount = 200,
                 totalCount = 200,
-                fileCap = 200,
             ),
             NOW,
         )
         assertEquals("200 photos backed up", model.statusSentence)
-        assertEquals("Back up 200 more files", model.primaryLabel)
+        assertEquals("Back up more", model.primaryLabel)
         assertFalse(model.primaryPauses)
-        val oneMore = homeUiModel(base(status = BackupStatus.Done, fileCap = 1), NOW)
-        assertEquals("Back up 1 more file", oneMore.primaryLabel)
+    }
+
+    @Test
+    fun runStoppedAtALimit_showsFilesLeftAsNormalProgress_andOffersTheNextRun() {
+        val model = homeUiModel(
+            base(
+                status = BackupStatus.Done,
+                backedUpCount = 340,
+                totalCount = 4000,
+                filesLeft = 3660,
+                stopReason = StopReason.SizeLimit,
+            ),
+            NOW,
+            locale = java.util.Locale.US,
+        )
+        assertEquals("3,660 files left", model.filesLeftLine)
+        assertEquals("340 photos backed up", model.statusSentence)
+        assertEquals("Backed up 340 of 4000", model.progressText)
+        assertEquals("Back up more", model.primaryLabel)
+        assertTrue(model.showProgress)
+        assertFalse(model.primaryPauses)
+        assertFalse(model.allBackedUp)
+        assertNull(model.offlineBanner)
+    }
+
+    @Test
+    fun oneFileLeft_usesTheSingular_andNoStopMeansNoLine() {
+        val one = homeUiModel(
+            base(status = BackupStatus.Done, backedUpCount = 3, totalCount = 4, filesLeft = 1, stopReason = StopReason.TimeLimit),
+            NOW,
+            locale = java.util.Locale.US,
+        )
+        assertEquals("1 file left", one.filesLeftLine)
+        assertNull(homeUiModel(base(status = BackupStatus.Done, backedUpCount = 4, totalCount = 4), NOW).filesLeftLine)
     }
 
     @Test
@@ -194,7 +224,7 @@ class HomeUiModelTest {
             model.statusSentence,
         )
         assertTrue(model.showDriveMismatch)
-        assertEquals("Back up 200 files", model.primaryLabel)
+        assertEquals("Back up", model.primaryLabel)
         assertNull(model.offlineBanner)
     }
 
@@ -205,7 +235,7 @@ class HomeUiModelTest {
             NOW,
         )
         assertEquals("An Original needs attention", model.statusSentence)
-        assertEquals("Back up 200 files", model.primaryLabel)
+        assertEquals("Back up", model.primaryLabel)
         assertFalse(model.showDriveMismatch)
     }
 
@@ -333,7 +363,8 @@ class HomeUiModelTest {
         totalCount: Int = 0,
         lastBackedUpAtEpochMillis: Long? = null,
         driveStatus: DriveStatus = DriveStatus.Ready,
-        fileCap: Int = 200,
+        filesLeft: Int = 0,
+        stopReason: StopReason? = null,
         sessionAccess: SessionAccess? = null,
     ): BackupUiState {
         return BackupUiState(
@@ -342,7 +373,8 @@ class HomeUiModelTest {
             totalCount = totalCount,
             lastBackedUpAtEpochMillis = lastBackedUpAtEpochMillis,
             driveStatus = driveStatus,
-            fileCap = fileCap,
+            filesLeft = filesLeft,
+            stopReason = stopReason,
             sessionAccess = sessionAccess,
         )
     }
