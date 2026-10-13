@@ -39,7 +39,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -52,9 +57,7 @@ import app.photoxpo.backup.BackupStatus
 import app.photoxpo.backup.BackupUiState
 import app.photoxpo.R
 import app.photoxpo.data.DriveStatus
-import app.photoxpo.ui.components.ChipTone
 import app.photoxpo.ui.components.RowCard
-import app.photoxpo.ui.components.StatusChip
 import app.photoxpo.ui.theme.PhotoxpoTheme
 import app.photoxpo.ui.theme.figuresInSans
 
@@ -65,12 +68,12 @@ fun HomeScreen(
     onPrimary: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenHistory: () -> Unit = {},
-    onOpenPhotos: () -> Unit = {},
     onChooseDrive: () -> Unit = {},
     onUseThisDriveInstead: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     isRefreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    bottomClearance: Dp = 0.dp,
 ) {
     var hideMismatch by remember { mutableStateOf(false) }
     LaunchedEffect(model.showDriveMismatch) {
@@ -78,57 +81,49 @@ fun HomeScreen(
     }
     val canStart = model.primaryPauses || model.driveConnected
 
-    Column(modifier = modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .defaultMinSize(minHeight = 64.dp)
-                .padding(horizontal = 20.dp)
-                .semantics { heading() },
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_logo_full),
-                contentDescription = "Photoxpo",
-                modifier = Modifier.height(40.dp),
-                tint = MaterialTheme.colorScheme.onSurface,
-            )
-        }
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = onRefresh,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-        ) {
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = modifier.fillMaxSize(),
+    ) {
         Column(
             modifier = Modifier
                 .widthIn(max = 600.dp)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
-                .padding(top = 8.dp, bottom = 24.dp),
+                .padding(bottom = 24.dp + bottomClearance),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 64.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_logo_full),
+                    contentDescription = "Photoxpo",
+                    modifier = Modifier
+                        .height(40.dp)
+                        .semantics { heading() },
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    DrivePill(model)
+                }
+            }
             model.accessWarning?.let { warning ->
                 AccessWarningBanner(
                     warning = warning,
                     onOpenSettings = onOpenSettings,
                 )
             }
-            StatusChip(
-                label = model.driveChipLabel,
-                icon = painterResource(
-                    if (model.driveConnected) R.drawable.ic_check_circle else R.drawable.ic_schedule,
-                ),
-                tone = if (model.driveConnected) ChipTone.Ok else ChipTone.Warn,
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (model.allBackedUp) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_check_circle),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp),
-                    )
-                }
+            Column(
+                modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 Text(
                     text = figuresInSans(model.statusSentence, figureSize = 30.sp),
                     modifier = Modifier.semantics {
@@ -137,96 +132,28 @@ fun HomeScreen(
                     },
                     style = MaterialTheme.typography.headlineSmall,
                 )
-                if (model.showProgress) {
-                    Text(
-                        text = model.progressText,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (model.allBackedUp) {
-                    Text(
-                        text = "Everything on your phone is safe on your Archive Drive. Pull down to check for new photos.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                model.newLine?.let { line ->
-                    Text(
-                        text = line,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                model.unplugReassurance?.let { line ->
-                    Text(
-                        text = line,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                model.paceLine?.let { pace ->
-                    Text(
-                        text = pace,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Progress(model)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_schedule),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-                Column {
-                    Text(
-                        text = model.lastBackedUpLine,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    model.lastBackedUpDate?.let { date ->
+                model.heroSubline?.let { line ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        if (model.allBackedUp) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_check_circle),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 1.dp).size(22.dp),
+                            )
+                        }
                         Text(
-                            text = date,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    model.lastRunLine?.let { took ->
-                        Text(
-                            text = took,
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = line,
+                            style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
             }
-            model.spaceLine?.let { line ->
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            model.spaceWarning?.let { warning ->
-                StatusChip(
-                    label = warning,
-                    icon = painterResource(R.drawable.ic_warning),
-                    tone = ChipTone.Warn,
-                )
-            }
-            model.longRunWarning?.let { warning ->
-                StatusChip(
-                    label = warning,
-                    icon = painterResource(R.drawable.ic_warning),
-                    tone = ChipTone.Warn,
-                )
-            }
+            if (hasStateCard(model)) StateCard(model)
             if (model.allBackedUp) {
                 // Nothing to start until a new photo shows up.
             } else if (model.primaryPauses) {
@@ -266,18 +193,20 @@ fun HomeScreen(
                 }
             }
             RowCard(
-                title = "Your photos",
-                supporting = "Browse your Previews",
-                icon = painterResource(R.drawable.ic_folder_photos),
-                onClick = onOpenPhotos,
-            )
-            RowCard(
                 title = "Backup history",
-                supporting = "By month and by backup",
+                supporting = model.historyLines.joinToString("\n"),
                 icon = painterResource(R.drawable.ic_history),
                 onClick = onOpenHistory,
             )
-        }
+            model.pullHint?.let { hint ->
+                Text(
+                    text = hint,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 
@@ -307,6 +236,116 @@ fun HomeScreen(
                     Text("Not now")
                 }
             },
+        )
+    }
+}
+
+/** Everything about what is happening now, or what is about to, lives in one card. */
+private fun hasStateCard(model: HomeUiModel): Boolean =
+    model.showProgress || model.newTitle != null || model.spaceWarning != null || model.longRunWarning != null
+
+@Composable
+private fun DrivePill(model: HomeUiModel) {
+    val colors = MaterialTheme.colorScheme
+    val connected = model.driveConnected
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (connected) Color.Transparent else colors.tertiaryContainer)
+            .padding(horizontal = if (connected) 0.dp else 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(if (connected) R.drawable.ic_check_circle else R.drawable.ic_schedule),
+            contentDescription = null,
+            tint = if (connected) colors.primary else colors.onTertiaryContainer,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = model.driveChipLabel,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+            color = if (connected) colors.onSurfaceVariant else colors.onTertiaryContainer,
+        )
+    }
+}
+
+@Composable
+private fun StateCard(model: HomeUiModel) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (model.primaryPauses) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Text(
+                        text = model.progressText,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    model.paceElapsed?.let { CardDetail(it) }
+                }
+                Progress(model)
+                model.paceLeft?.let { CardDetail(it) }
+                model.unplugReassurance?.let { CardDetail(it) }
+            } else {
+                if (model.newTitle != null) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(text = model.newTitle, style = MaterialTheme.typography.titleMedium)
+                        model.newDetail?.let { CardDetail(it) }
+                    }
+                }
+                if (model.showProgress) {
+                    Progress(model)
+                    CardDetail(model.progressText)
+                    model.lastRunLine?.let { CardDetail(it) }
+                }
+            }
+            model.spaceWarning?.let { WarningNote(it) }
+            model.longRunWarning?.let { WarningNote(it) }
+        }
+    }
+}
+
+@Composable
+private fun CardDetail(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun WarningNote(text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_warning),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+            modifier = Modifier.padding(top = 1.dp).size(20.dp),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
         )
     }
 }

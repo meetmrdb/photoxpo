@@ -184,7 +184,7 @@ The system is native Material 3 in a single teal voice, tuned for someone who is
 Brand lives in color roles, the type scale and the shape scale, as Material 3 intends. It is not carried by custom components.
 
 **Key Characteristics:**
-- Native Material 3 structure (navigation bar, top app bar, bottom sheets, system dialogs), single teal brand hue.
+- Native Material 3 structure (top app bar, bottom sheets, system dialogs) with a floating navigation pill, single teal brand hue.
 - Tonal layering instead of shadows: surfaces step up in tone, never in drop shadow.
 - Pill buttons 56 dp tall; every touch target at least 48 dp.
 - Large type: 26 sp headline status, 16 sp body minimum for anything read.
@@ -248,11 +248,11 @@ A cool, pale teal-white field with one deep teal accent, warm amber for "waiting
 
 ## Layout
 
-Single-column phone, compact width. Content padding is 20 dp on Home, 16 dp elsewhere, with 16 dp vertical rhythm between stacked blocks (`stack` gap). Home scrolls inside the standard layout: app bar, drive chip, headline sentence plus one supporting line, progress bar only while copying, last-backed-up line, one 56 dp primary button, then two row cards ("Your photos", "Backup history").
+Single-column phone, compact width. Content padding is 20 dp on Home, 16 dp elsewhere, with 16 dp vertical rhythm between stacked blocks (`stack` gap). Home scrolls: the logo with a small drive status beside it, the headline sentence plus at most one supporting line, one state card (what is waiting, or the progress, pace and warnings of a run), one 56 dp primary button, then one Backup history card that also carries when it last ran and the free space. Photos is the bottom pill's other destination, so Home has no link to it.
 
-The Photos tab is a 3-column grid with 3 dp gutters and edge padding, grouped by sticky 14 sp month headers. Sample a month, never render everything. History is a list of 88 dp month rows, each with a 4-photo thumbnail strip, month, count, and a state pill.
+The Photos tab is a serif title with a compact Months / Days control, one status strip (how many are on the Archive Drive and how many new ones wait; its drive mark is the legend for the mark on each tile), then a 3-column grid with 3 dp gutters, grouped by sticky serif month headers. Sample a month, never render everything. History is a list of 88 dp month rows, each with a 4-photo thumbnail strip, month, count, and a state pill.
 
-Edge-to-edge with status, navigation and IME insets applied. Bottom Material navigation bar with two destinations (Home, Photos) on compact width; the history screen is a pushed child with a back arrow. On expanded widths, use a navigation rail rather than stretching the phone layout.
+Edge-to-edge with status, navigation and IME insets applied. A floating navigation pill with two destinations (Home, Photos) on compact width; the history screen is a pushed child with a back arrow. On expanded widths, use a navigation rail rather than stretching the phone layout.
 
 ### Named Rules
 **The One Button Rule.** One filled primary button per screen. A second action is tonal or text.
@@ -262,7 +262,7 @@ Edge-to-edge with status, navigation and IME insets applied. Bottom Material nav
 Tonal, not shadowed. Depth comes from stepping the surface tone: Background → Surface (cards, chips, nav bar) → Surface High (tracks, disabled). No drop shadows on app chrome. Scrim at 62% dims behind sheets and dialogs and sits behind overlays on photos. In the photo viewer, depth is a pair of black gradients (top ~#000 at 70% fading out, bottom fading in over 72 dp) so text and actions stay readable on any photo.
 
 ### Named Rules
-**The Flat Chrome Rule.** App chrome has no shadows. Only the photo viewer uses gradients, and only to keep text legible.
+**The Flat Chrome Rule.** App chrome has no shadows; the floating pill is lifted by a brighter tone and a 1 dp outline instead. Only the photo viewer uses gradients, and only to keep text legible.
 
 ## Shapes
 
@@ -291,12 +291,12 @@ Soft and rounded, with a clear size hierarchy: pill buttons (28 dp radius at 56 
 - **Internal Padding:** 14 × 16 dp (row), 20 dp (info).
 
 ### Navigation
-- Material 3 navigation bar, 80 dp tall on Sea Mist, two destinations with outline icons and always-visible 12 sp labels. The selected item shows a 64 × 32 dp Sea Glass indicator pill with on-container icon and a full-contrast label.
+- A floating pill, 64 dp tall and centred 16 dp above the bottom edge (plus the system inset), on Mist High with a 1 dp outline and no shadow. Two destinations, each 48 dp tall and at least 104 dp wide, with an icon and an always-visible 14 sp label. The selected item fills with Sea Glass. Lists pad their end by 96 dp so the last row clears it and the rest scrolls under it. On windows 600 dp and wider it is a navigation rail instead.
 - Top app bar: 64 dp, Title Large, 48 dp icon buttons; back arrow variant has 4 dp left padding. System Back always works.
 - **Segmented control** (Months / Days; By month / By backup): 1 dp outline border, 20 dp radius, 40 dp segments, selected segment in Quiet Tonal Teal.
 
 ### Photo grid
-- 3 columns, 3 dp gutters, square tiles. Each tile whose Original lives only on the drive carries a 24 dp circular scrim badge with a 15 dp drive glyph, bottom-right. Videos carry a 22 dp scrim chip with a play glyph and duration, bottom-left. A one-line legend under the grid explains the badge. Month header sticky at 14 sp, Slate Teal.
+- 3 columns, 3 dp gutters, square tiles. Each tile whose Original lives only on the drive carries a 24 dp circular scrim badge with a 15 dp drive glyph, bottom-right. Videos carry a 22 dp scrim chip with a play glyph and duration, bottom-left. The status strip above the grid shows the same mark and says what it means. Month header sticky, Instrument Serif 22 sp, with its figures in the sans.
 
 ### Progress bar
 - 8 dp, Mist High track, teal fill, 4 dp radius, 0.3 s linear width transition. Shown only while a copy or Load is running, never at rest.

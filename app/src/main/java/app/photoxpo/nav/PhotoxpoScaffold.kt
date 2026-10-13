@@ -1,5 +1,6 @@
 package app.photoxpo.nav
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +9,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.navigation.NavHostController
@@ -49,21 +52,15 @@ fun PhotoxpoScaffold(
                 onPhotos = { navController.openTab(AppRoutes.Photos) },
             )
         }
+        val floatingNav = showBottomBar && !showRail
+        val clearance = if (floatingNav) FloatingNavClearance else 0.dp
+        Box(modifier = Modifier.weight(1f).fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.weight(1f).fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             contentWindowInsets = if (showBottomBar || onboardingVisible) {
                 ScaffoldDefaults.contentWindowInsets
             } else {
                 WindowInsets(0, 0, 0, 0)
-            },
-            bottomBar = {
-                if (showBottomBar && !showRail) {
-                    PhotoxpoBottomBar(
-                        currentRoute = route ?: AppRoutes.Home,
-                        onHome = { navController.openTab(AppRoutes.Home) },
-                        onPhotos = { navController.openTab(AppRoutes.Photos) },
-                    )
-                }
             },
         ) { innerPadding ->
             NavHost(
@@ -89,7 +86,7 @@ fun PhotoxpoScaffold(
                                 launchSingleTop = true
                             }
                         },
-                        onOpenPhotos = { navController.openTab(AppRoutes.Photos) },
+                        bottomClearance = clearance,
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
@@ -104,6 +101,7 @@ fun PhotoxpoScaffold(
                         repository = repository,
                         previewCache = previewCache,
                         contentPadding = innerPadding,
+                        bottomClearance = clearance,
                         onOpenPhoto = { hash ->
                             navController.navigate(AppRoutes.photo(hash))
                         },
@@ -123,6 +121,15 @@ fun PhotoxpoScaffold(
                     )
                 }
             }
+        }
+        if (floatingNav) {
+            PhotoxpoFloatingNav(
+                currentRoute = route ?: AppRoutes.Home,
+                onHome = { navController.openTab(AppRoutes.Home) },
+                onPhotos = { navController.openTab(AppRoutes.Photos) },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
         }
     }
 }
