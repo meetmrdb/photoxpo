@@ -46,11 +46,18 @@ typography:
     fontWeight: 400
     lineHeight: 1.12
     letterSpacing: "0"
+  headline-medium:
+    fontFamily: "Instrument Serif, serif"
+    fontSize: "26sp"
+    fontWeight: 400
+    lineHeight: 1.15
+    letterSpacing: "0"
   title-large:
-    fontFamily: "Roboto, sans-serif"
+    fontFamily: "Instrument Serif, serif"
     fontSize: "22sp"
-    fontWeight: 500
-    lineHeight: 1.25
+    fontWeight: 400
+    lineHeight: 1.27
+    letterSpacing: "0"
   title-medium:
     fontFamily: "Roboto, sans-serif"
     fontSize: "16sp"
@@ -219,15 +226,16 @@ A cool, pale teal-white field with one deep teal accent, warm amber for "waiting
 
 ## Typography
 
-**Display Font:** Instrument Serif (the wordmark's own face, bundled, SIL OFL; headlines only, single weight)
+**Display Font:** Instrument Serif (the wordmark's own face, bundled, SIL OFL; text of 20 sp and up only, single weight)
 **Body Font:** Roboto
 **Label/Mono Font:** none
 
-**Character:** Plain, confident and large. Medium weights for status and actions, regular for explanation. Instrument Serif appears only on the headline, never on controls or body, and its flagless "1" reads as a lowercase L, so figures inside a headline are set in Roboto Medium 30 sp. No other decorative faces, nothing smaller than 12 sp, and all sizes in `sp` so the system font-size setting works (the prototype has a 130% large-text mode that must hold without clipping).
+**Character:** Plain, confident and large. Medium weights for status and actions, regular for explanation. Instrument Serif carries the voice wherever text is big, short and not tappable: the headline sentence, top bar titles, month names, dialog titles and empty-state headlines. Its flagless "1" reads as a lowercase L, so every figure (counts, sizes, years) inside serif text is set in the device sans at regular weight, a little smaller than the line (`figuresInSans`). No other decorative faces, nothing smaller than 12 sp, and all sizes in `sp` so the system font-size setting works (the prototype has a 130% large-text mode that must hold without clipping).
 
 ### Hierarchy
 - **Headline Small** (Instrument Serif 400, 34 sp, 1.12 line height): The one status sentence on Home ("All 1,204 photos are on your drive"). Balanced wrapping.
-- **Title Large** (500, 22 sp, 1.25): Top app bar titles.
+- **Headline Medium** (Instrument Serif 400, 26 sp): Dialog titles, set explicitly because Material's own default for dialogs is the larger Headline Small.
+- **Title Large** (Instrument Serif 400, 22 sp, 1.27): Top app bar titles and month names.
 - **Title Medium** (500, 16 sp, 1.4): Button labels, row card titles, the photo viewer title.
 - **Body Large** (400, 16 sp, 1.45): Explanations, onboarding copy, the load card's hint.
 - **Body Medium** (400, 14 sp, 1.4): Chips, supporting lines, month headers (500), history counts.
@@ -235,6 +243,8 @@ A cool, pale teal-white field with one deep teal accent, warm amber for "waiting
 
 ### Named Rules
 **The Sentence First Rule.** Each screen opens with one complete plain sentence as its headline, never a label or a number alone.
+
+**The Serif Floor Rule.** Instrument Serif is for text of 20 sp or more and never on a button, chip, control or paragraph. Anything smaller, tappable or full of figures stays in the sans.
 
 ## Layout
 

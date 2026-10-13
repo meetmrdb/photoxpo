@@ -87,7 +87,7 @@ private val DarkColorScheme = darkColorScheme(
 
 private val Roboto = FontFamily.Default
 
-// The wordmark's own face, for the one headline per screen. Single weight, made for large sizes.
+// The wordmark's own face, for text of 20 sp or more: headline, titles, month names, dialog titles. Single weight, made for large sizes.
 private val InstrumentSerif = FontFamily(Font(R.font.instrument_serif))
 
 private val PhotoxpoTypography = Typography(
@@ -98,11 +98,21 @@ private val PhotoxpoTypography = Typography(
         lineHeight = 38.sp,
         letterSpacing = 0.sp,
     ),
+    // Dialog titles. Dialogs set this explicitly: Material's own default is headlineSmall, too big for a dialog.
+    headlineMedium = TextStyle(
+        fontFamily = InstrumentSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 26.sp,
+        lineHeight = 30.sp,
+        letterSpacing = 0.sp,
+    ),
+    // Top bar titles and month names. The serif is only for text of 20 sp or more, never on controls or body.
     titleLarge = TextStyle(
-        fontFamily = Roboto,
-        fontWeight = FontWeight.Medium,
+        fontFamily = InstrumentSerif,
+        fontWeight = FontWeight.Normal,
         fontSize = 22.sp,
         lineHeight = 28.sp,
+        letterSpacing = 0.sp,
     ),
     titleMedium = TextStyle(
         fontFamily = Roboto,

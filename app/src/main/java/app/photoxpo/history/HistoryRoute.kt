@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -67,6 +68,7 @@ import app.photoxpo.data.SafArchiveDrive
 import app.photoxpo.data.probeArchiveDrive
 import app.photoxpo.photos.PhotosDatabase
 import app.photoxpo.ui.theme.PhotoxpoTheme
+import app.photoxpo.ui.theme.figuresInSans
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -403,7 +405,7 @@ private fun MonthHeading(
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = section.monthLabel,
+                text = figuresInSans(section.monthLabel, figureSize = 19.sp),
                 modifier = Modifier.semantics { heading() },
                 style = MaterialTheme.typography.titleLarge,
             )
