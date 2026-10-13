@@ -45,6 +45,18 @@ data class BackupItemOutcome(
     val state: ItemState,
 )
 
+/** What a Backup run is doing right now, so Home can say so. */
+enum class RunStage {
+    /** Copying an Original that is not on the Archive Drive yet. */
+    Copying,
+
+    /** Checking an Original that is already Backed up. */
+    Checking,
+}
+
+/** The run reached Original number [done] + 1 of [of] in this [stage]; [done] counts the ones already finished. */
+data class RunStep(val stage: RunStage, val done: Int, val of: Int)
+
 data class BackupRunResult(
     val manifestPath: String,
     val items: List<BackupItemOutcome>,
@@ -75,6 +87,8 @@ class BackupRunner(
      */
     private val externalStop: () -> StopReason? = { null },
     private val checkPolicy: CheckPolicy = CheckPolicy.skipRecentlyChecked(),
+    /** Called before each Original, so the person can see whether the run is copying or checking. */
+    private val onStep: (RunStep) -> Unit = {},
 ) {
     fun start(): BackupRunResult {
         val startedAt = clock.instant()
@@ -124,7 +138,16 @@ class BackupRunner(
             var stopReason: StopReason? = null
             var committedCount = 0
             var committedBytes = 0L
-            for (file in files) {
+            // New Originals first: they are the only ones not safe yet, so they never wait behind re-checks.
+            val (newFiles, backedUpFiles) = files.partition { backedUpLedger.checkedOriginal(it.id) == null }
+            var newDone = 0
+            var checkedDone = 0
+            for ((file, isNewFile) in newFiles.map { it to true } + backedUpFiles.map { it to false }) {
+                if (isNewFile) {
+                    onStep(RunStep(RunStage.Copying, newDone++, newFiles.size))
+                } else {
+                    onStep(RunStep(RunStage.Checking, checkedDone++, backedUpFiles.size))
+                }
                 // Between Originals, so a pause does not leave a partial Original.
                 if (isCancelled()) {
                     return cancelBetweenFiles(
@@ -152,6 +175,11 @@ class BackupRunner(
                             charging = battery?.charging ?: false,
                         ),
                     )
+                }
+                if (!isNewFile && reasonNow != null) {
+                    // Re-checking can wait for the next run, so a stop ends the run instead of draining the phone.
+                    stopReason = reasonNow
+                    break
                 }
                 val copied = try {
                     copier.copy(file, allowNewCopy = reasonNow == null)

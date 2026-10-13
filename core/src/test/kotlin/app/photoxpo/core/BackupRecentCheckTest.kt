@@ -144,6 +144,55 @@ class BackupRecentCheckTest {
         assertFalse(CheckPolicy.verifyEverything.isRecentlyChecked(fresh, file, now))
     }
 
+    @Test
+    fun newOriginalsAreCopiedBeforeBackedUpOnesAreChecked_andEachStepIsReported() {
+        val setup = setup()
+        setup.runner().start()
+        val extra = file("media-2", "IMG_0002.jpg", byteArrayOf(9, 8, 7, 6))
+        setup.source.add(extra.first, extra.second)
+
+        clock.now = clock.now.plus(RECENTLY_CHECKED_WINDOW).plusSeconds(1)
+        val steps = mutableListOf<RunStep>()
+        val runner = BackupRunner(
+            mediaSource = setup.source,
+            archiveDrive = setup.drive,
+            clock = clock,
+            backedUpLedger = setup.ledger,
+            newDriveId = { "drive-1" },
+            onStep = { steps += it },
+        )
+        runner.start()
+
+        assertEquals(
+            listOf(RunStep(RunStage.Copying, 0, 1), RunStep(RunStage.Checking, 0, 1)),
+            steps,
+        )
+    }
+
+    @Test
+    fun aStopEndsTheRunBeforeBackedUpOriginalsAreChecked() {
+        val setup = setup()
+        setup.runner().start()
+        val extra = file("media-2", "IMG_0002.jpg", byteArrayOf(9, 8, 7, 6))
+        setup.source.add(extra.first, extra.second)
+
+        clock.now = clock.now.plus(RECENTLY_CHECKED_WINDOW).plusSeconds(1)
+        setup.source.opens = 0
+        val result = BackupRunner(
+            mediaSource = setup.source,
+            archiveDrive = setup.drive,
+            clock = clock,
+            backedUpLedger = setup.ledger,
+            newDriveId = { "drive-1" },
+            batteryInput = BatteryInput { BatteryStatus(percent = 10, charging = false) },
+        ).start()
+
+        assertEquals(StopReason.LowBattery, result.stopReason)
+        assertEquals(1, result.filesLeft)
+        // Only the new Original is read, to see it is not on the drive yet; the backed up one is left alone.
+        assertEquals(1, setup.source.opens)
+    }
+
     private fun setup(): Setup {
         val root = folders.newFolder().toPath()
         val drive = CountingDrive(FakeArchiveDrive(root))

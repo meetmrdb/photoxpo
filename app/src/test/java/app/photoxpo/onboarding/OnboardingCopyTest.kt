@@ -103,7 +103,7 @@ class OnboardingCopyTest {
         )
         assertEquals("Archive Drive chosen", withDrive.archiveDrive)
         assertEquals("Previews Sharper", withDrive.previews)
-        assertEquals("The first backup takes hours and can be paused.", withDrive.note)
+        assertEquals("The first backup takes hours and can be paused. You can unplug your drive any time; backup carries on when you plug it back in.", withDrive.note)
         assertEquals("Start backup", withDrive.button)
 
         val withoutDrive = readyLines(

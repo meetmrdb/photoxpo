@@ -11,6 +11,7 @@ import app.photoxpo.backup.SessionAccess
 import app.photoxpo.backup.backupProgressText
 import app.photoxpo.backup.sessionAccessMessage
 import app.photoxpo.core.LOW_BATTERY_PERCENT
+import app.photoxpo.core.RunStage
 import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.onboarding.MediaAccessState
@@ -48,6 +49,10 @@ data class HomeUiModel(
     val showProgress: Boolean = false,
     val lastBackedUpDate: String? = null,
     val longRunWarning: String? = null,
+    /** What is waiting to be Backed up, e.g. "12 new photos and videos · 1.4 GB to back up". */
+    val newLine: String? = null,
+    /** Said while a run is going, so unplugging the drive never feels risky. */
+    val unplugReassurance: String? = null,
 )
 
 fun homeUiModel(
@@ -80,6 +85,8 @@ fun homeUiModel(
             stopHeadline(state, locale) != null,
         lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
         longRunWarning = longRunWarning(state),
+        newLine = newLine(state, locale),
+        unplugReassurance = unplugReassurance(state),
     )
 }
 
@@ -97,6 +104,30 @@ private fun stopHeadline(state: BackupUiState, locale: Locale): String? {
         StopReason.SizeLimit, StopReason.TimeLimit -> "Time limit reached. $left."
         StopReason.DriveFull -> null
     }
+}
+
+/** Shown only when idle: while a run goes the progress text already says how much is left. */
+internal fun newLine(state: BackupUiState, locale: Locale = Locale.getDefault()): String? {
+    val settled = state.status == BackupStatus.Idle || state.status == BackupStatus.Done
+    if (!settled || state.driveStatus != DriveStatus.Ready) return null
+    val count = state.filesToCopy ?: return null
+    if (count <= 0) return null
+    val videos = (state.videosToCopy ?: 0).coerceIn(0, count)
+    val noun = when {
+        videos == 0 -> if (count == 1) "photo" else "photos"
+        videos == count -> if (count == 1) "video" else "videos"
+        else -> "photos and videos"
+    }
+    val number = java.text.NumberFormat.getIntegerInstance(locale).format(count)
+    val size = state.bytesToCopy?.let { " · ${formatBytes(it)} to back up" } ?: " to back up"
+    return "$number new $noun$size"
+}
+
+internal const val UNPLUG_REASSURANCE =
+    "You can unplug your drive any time. Backup carries on when you plug it back in."
+
+private fun unplugReassurance(state: BackupUiState): String? {
+    return if (state.status == BackupStatus.Running) UNPLUG_REASSURANCE else null
 }
 
 /** Everything in the Camera folder is Backed up, so there is nothing to start until a new photo appears. */
@@ -159,7 +190,8 @@ private fun statusSentence(state: BackupUiState, locale: Locale): String {
         BackupStatus.Idle,
         BackupStatus.Done,
         -> stopHeadline(state, locale) ?: backedUpSentence(state.backedUpCount)
-        BackupStatus.Running -> "Backing up your photos"
+        BackupStatus.Running ->
+            if (state.runStage == RunStage.Checking) "Checking your backed up photos" else "Backing up your photos"
         is BackupStatus.Paused -> when (status.reason) {
             PauseReason.User -> "Backup paused"
             PauseReason.DriveOut ->
@@ -196,6 +228,9 @@ private fun primaryLabel(state: BackupUiState): String {
 }
 
 private fun progressFraction(state: BackupUiState): Float? {
+    if (state.status == BackupStatus.Running && state.runStage == RunStage.Checking && state.stageTotal > 0) {
+        return (state.stageDone.toFloat() / state.stageTotal.toFloat()).coerceIn(0f, 1f)
+    }
     if (state.totalCount <= 0) return null
     return (state.backedUpCount.toFloat() / state.totalCount.toFloat()).coerceIn(0f, 1f)
 }

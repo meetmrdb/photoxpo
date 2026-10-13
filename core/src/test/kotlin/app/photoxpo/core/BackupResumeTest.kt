@@ -241,7 +241,8 @@ class BackupResumeTest {
         result: BackupRunResult,
         samples: List<Sample>,
     ) {
-        assertEquals(samples.map { it.file.id }, result.items.map { it.id })
+        // New Originals come first in a run, so the order of items is not the oldest-first order of the camera.
+        assertEquals(samples.map { it.file.id }.sorted(), result.items.map { it.id }.sorted())
         for (sample in samples) {
             val item = result.items.single { it.id == sample.file.id }
             assertEquals(ItemState.COMMITTED, item.state)

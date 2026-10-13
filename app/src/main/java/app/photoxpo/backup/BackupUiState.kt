@@ -4,13 +4,14 @@ import app.photoxpo.core.BackupRunResult
 import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.ItemState
 import app.photoxpo.core.RecentRun
+import app.photoxpo.core.RunStage
 import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.onboarding.MediaAccessState
 import app.photoxpo.onboarding.accessWarning
 import app.photoxpo.onboarding.classifyMediaAccess
 
-const val MESSAGE_DRIVE_OUT = "Archive Drive disconnected."
+const val MESSAGE_DRIVE_OUT = "Your Archive Drive was unplugged. Nothing is lost. Backup carries on when you plug it back in."
 
 const val MESSAGE_PAUSED_USER = "Backup paused."
 
@@ -107,6 +108,12 @@ data class BackupUiState(
     val bytesToCopy: Long? = null,
     /** How many Camera files are not Backed up yet; null until Home has looked. */
     val filesToCopy: Int? = null,
+    /** How many of those are videos, so Home can say "photos", "videos" or both. */
+    val videosToCopy: Int? = null,
+    /** What the current run is doing, and how far through that stage it is. Null when no step has begun. */
+    val runStage: RunStage? = null,
+    val stageDone: Int = 0,
+    val stageTotal: Int = 0,
     /** When this run began, and what it had to copy then, so Home can say how long and how much is left. */
     val runStartedAtMillis: Long? = null,
     val runBytesToCopy: Long = 0L,
@@ -137,6 +144,10 @@ fun BackupUiState.runStarted(
         driveStatus = driveStatus,
         message = kept,
         filesToCopy = null,
+        videosToCopy = null,
+        runStage = null,
+        stageDone = 0,
+        stageTotal = 0,
         runStartedAtMillis = nowEpochMillis,
         runBytesToCopy = bytesToCopy,
         runBytesCopied = 0L,
@@ -162,6 +173,9 @@ fun BackupUiState.withBackedUpCount(backedUpCount: Int): BackupUiState {
 }
 
 fun backupProgressText(state: BackupUiState): String {
+    if (state.status == BackupStatus.Running && state.runStage == RunStage.Checking && state.stageTotal > 0) {
+        return "Checked ${state.stageDone} of ${state.stageTotal} already on your drive"
+    }
     if (state.totalCount > 0) {
         return "Backed up ${state.backedUpCount} of ${state.totalCount}"
     }
@@ -209,5 +223,6 @@ fun reduceBackupRun(
         message = message,
         stopReason = result.stopReason,
         filesLeft = result.filesLeft,
+        runStage = null,
     )
 }

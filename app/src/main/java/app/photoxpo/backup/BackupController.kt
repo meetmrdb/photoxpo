@@ -15,6 +15,7 @@ import app.photoxpo.core.BackupRunner
 import app.photoxpo.core.DriveFullException
 import app.photoxpo.core.BackedUpLedger
 import app.photoxpo.core.MediaFile
+import app.photoxpo.core.MediaKind
 import app.photoxpo.core.ItemState
 import app.photoxpo.core.RecentRun
 import app.photoxpo.core.StopReason
@@ -346,6 +347,9 @@ class BackupController private constructor(
                         isCancelled = { cancel.get() },
                         externalStop = { if (timeLimitStop.get()) StopReason.TimeLimit else null },
                         batteryInput = AndroidBatteryInput(appContext),
+                        onStep = { step ->
+                            _state.update { it.copy(runStage = step.stage, stageDone = step.done, stageTotal = step.of) }
+                        },
                     ).start()
                     RunOutcome(result, probeOrAbsent(uri))
                 } finally {
@@ -581,6 +585,7 @@ class BackupController private constructor(
                         driveFreeBytes = free,
                         bytesToCopy = left.sumOf { f -> f.sizeBytes },
                         filesToCopy = left.size,
+                        videosToCopy = left.count { f -> f.kind == MediaKind.VIDEO },
                         batteryPercent = battery?.percent,
                         charging = battery?.charging ?: false,
                     )
