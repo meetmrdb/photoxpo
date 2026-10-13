@@ -48,6 +48,7 @@ data class HomeUiModel(
     val showProgress: Boolean = false,
     val lastBackedUpDate: String? = null,
     val filesLeftLine: String? = null,
+    val longRunWarning: String? = null,
 )
 
 fun homeUiModel(
@@ -80,6 +81,7 @@ fun homeUiModel(
             filesLeftLine(state, locale) != null,
         lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
         filesLeftLine = filesLeftLine(state, locale),
+        longRunWarning = longRunWarning(state),
     )
 }
 

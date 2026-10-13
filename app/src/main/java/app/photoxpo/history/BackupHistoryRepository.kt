@@ -60,6 +60,7 @@ private fun BackupRunSummary.toEntity(): BackupRunEntity {
         mbPerSecond = mbPerSecond,
         interrupted = interrupted,
         runEnd = runEnd?.wire,
+        batteryDropPercent = batteryDropPercent,
     )
 }
 
@@ -75,5 +76,6 @@ private fun BackupRunEntity.toSummary(): BackupRunSummary {
         mbPerSecond = mbPerSecond,
         interrupted = interrupted,
         runEnd = RunEnd.fromWire(runEnd),
+        batteryDropPercent = batteryDropPercent,
     )
 }

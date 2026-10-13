@@ -16,6 +16,9 @@ import app.photoxpo.core.DriveFullException
 import app.photoxpo.core.BackedUpLedger
 import app.photoxpo.core.MediaFile
 import app.photoxpo.core.ItemState
+import app.photoxpo.core.RecentRun
+import app.photoxpo.core.byBackup
+import java.time.Duration
 import app.photoxpo.PhotoxpoApp
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.data.MediaStoreSource
@@ -539,12 +542,38 @@ class BackupController private constructor(
                 val ledger = settings.ledgerEntries().keys
                 val left = MediaStoreSource(appContext).listCameraFolder()
                     .filter { it.id !in ledger }
+                val battery = AndroidBatteryInput(appContext).read()
                 _state.update {
-                    it.copy(driveFreeBytes = free, bytesToCopy = left.sumOf { f -> f.sizeBytes }, filesToCopy = left.size)
+                    it.copy(
+                        driveFreeBytes = free,
+                        bytesToCopy = left.sumOf { f -> f.sizeBytes },
+                        filesToCopy = left.size,
+                        batteryPercent = battery?.percent,
+                        charging = battery?.charging ?: false,
+                    )
                 }
+                // Not during a run: its run file has no footer yet and would be read again every tick.
+                if (_state.value.status != BackupStatus.Running) refreshRecentRuns(uri)
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
             }
+        }
+    }
+
+    /** Reads new run files from the Archive Drive and keeps the latest few for Home's time and battery estimate. */
+    private suspend fun refreshRecentRuns(uri: Uri) {
+        try {
+            val all = BackupHistoryRepository(
+                dao = PhotosDatabase.get(appContext).backupRunDao(),
+                settings = settings,
+            ).refresh(SafArchiveDrive(appContext, uri))
+            val recent = byBackup(all.filter { !it.interrupted })
+                .take(RECENT_RUNS_KEPT)
+                .map { RecentRun(it.bytes, it.batteryDropPercent, it.elapsedMs?.let(Duration::ofMillis)) }
+            _state.update { it.copy(recentRuns = recent) }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            // No history just means the cautious fallback estimate.
         }
     }
 
@@ -607,6 +636,7 @@ class BackupController private constructor(
 
     companion object {
         private const val SPACE_REFRESH_MS = 120_000L
+        private const val RECENT_RUNS_KEPT = 5
         private const val DRIVE_GONE_PROBES = 8
         private const val DRIVE_GONE_PROBE_GAP_MS = 750L
         private const val WAKE_LOCK_TAG = "app.photoxpo:backup-run"

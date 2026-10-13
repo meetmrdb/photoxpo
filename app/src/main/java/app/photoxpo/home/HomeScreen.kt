@@ -218,6 +218,13 @@ fun HomeScreen(
                     tone = ChipTone.Warn,
                 )
             }
+            model.longRunWarning?.let { warning ->
+                StatusChip(
+                    label = warning,
+                    icon = painterResource(R.drawable.ic_warning),
+                    tone = ChipTone.Warn,
+                )
+            }
             if (model.allBackedUp) {
                 // Nothing to start until a new photo shows up.
             } else if (model.primaryPauses) {

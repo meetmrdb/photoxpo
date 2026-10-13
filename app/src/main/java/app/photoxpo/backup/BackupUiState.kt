@@ -3,6 +3,7 @@ package app.photoxpo.backup
 import app.photoxpo.core.BackupRunResult
 import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.ItemState
+import app.photoxpo.core.RecentRun
 import app.photoxpo.core.StopReason
 import app.photoxpo.data.DriveStatus
 import app.photoxpo.onboarding.MediaAccessState
@@ -113,6 +114,11 @@ data class BackupUiState(
     val firstCopyAtMillis: Long? = null,
     val firstCopyBytes: Long = 0L,
     val lastRunTookMillis: Long? = null,
+    /** The phone's battery as last read; null when unknown. Home uses it for the before-start warning. */
+    val batteryPercent: Int? = null,
+    val charging: Boolean = false,
+    /** Latest finished Backup runs, newest first, so Home can estimate time and battery use. */
+    val recentRuns: List<RecentRun> = emptyList(),
 )
 
 fun BackupUiState.runStarted(

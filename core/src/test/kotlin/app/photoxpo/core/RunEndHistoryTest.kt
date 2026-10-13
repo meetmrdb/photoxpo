@@ -68,7 +68,42 @@ class RunEndHistoryTest {
         assertEquals(RunEnd.Finished, RunEnd.fromWire(RunEnd.Finished.wire))
     }
 
-    private fun runOver(drive: ArchiveDrive, policy: StopPolicy) {
+    @Test
+    fun runRecordsItsBatteryDrop_andHistoryReadsItBack() {
+        val drive = FakeArchiveDrive(folders.newFolder("drop").toPath())
+        var reads = 0
+        // 80% when the run starts, 74% from then on.
+        runOver(drive, DefaultStopPolicy(), BatteryInput { BatteryStatus(if (reads++ == 0) 80 else 74, charging = false) })
+
+        assertEquals(6, BackupHistoryReader().read(drive, emptySet()).single().batteryDropPercent)
+    }
+
+    @Test
+    fun noBatteryDropIsRecordedWhileChargingOrWhenTheBatteryIsUnknown() {
+        val charging = FakeArchiveDrive(folders.newFolder("charging").toPath())
+        runOver(charging, DefaultStopPolicy(), BatteryInput { BatteryStatus(60, charging = true) })
+        assertNull(BackupHistoryReader().read(charging, emptySet()).single().batteryDropPercent)
+
+        val unknown = FakeArchiveDrive(folders.newFolder("unknown").toPath())
+        runOver(unknown, DefaultStopPolicy(), BatteryInput { null })
+        assertNull(BackupHistoryReader().read(unknown, emptySet()).single().batteryDropPercent)
+    }
+
+    @Test
+    fun olderFooterWithoutABatteryDrop_stillReads() {
+        val drive = FakeArchiveDrive(folders.newFolder("nodrop").toPath())
+        drive.appendText(
+            "$RUNS/20261011T183000000Z.jsonl",
+            "{\"type\":\"header\",\"startedAt\":\"2026-10-11T18:30:00.000Z\"}\n" +
+                "{\"type\":\"footer\",\"startedAt\":\"2026-10-11T18:30:00.000Z\",\"endedAt\":\"2026-10-11T18:32:00.000Z\"," +
+                "\"fileCount\":0,\"bytes\":0,\"checked\":true,\"elapsedMs\":1,\"mbPerSecond\":1.0,\"stopReason\":\"finished\"}\n",
+        )
+        val summary = BackupHistoryReader().read(drive, emptySet()).single()
+        assertNull(summary.batteryDropPercent)
+        assertEquals(RunEnd.Finished, summary.runEnd)
+    }
+
+    private fun runOver(drive: ArchiveDrive, policy: StopPolicy, battery: BatteryInput = BatteryInput { null }) {
         val files = (1..5).map { i ->
             MediaFile(
                 id = "media-$i",
@@ -83,6 +118,7 @@ class RunEndHistoryTest {
             archiveDrive = drive,
             clock = Clock.fixed(Instant.parse("2026-10-11T18:30:00Z"), ZoneOffset.UTC),
             stopPolicy = policy,
+            batteryInput = battery,
         ).start()
     }
 
