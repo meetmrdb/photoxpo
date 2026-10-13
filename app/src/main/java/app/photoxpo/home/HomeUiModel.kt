@@ -45,6 +45,7 @@ data class HomeUiModel(
     val driveChipLabel: String = "Drive connected",
     val showProgress: Boolean = false,
     val lastBackedUpDate: String? = null,
+    val filesLeftLine: String? = null,
 )
 
 fun homeUiModel(
@@ -72,9 +73,19 @@ fun homeUiModel(
         lastRunLine = lastRunLine(state),
         spaceWarning = spaceWarning(state),
         driveChipLabel = driveChipLabel(state.driveStatus),
-        showProgress = state.status == BackupStatus.Running || state.status is BackupStatus.Paused,
+        showProgress = state.status == BackupStatus.Running ||
+            state.status is BackupStatus.Paused ||
+            filesLeftLine(state, locale) != null,
         lastBackedUpDate = lastBackedUpDate(state.lastBackedUpAtEpochMillis, zone, locale),
+        filesLeftLine = filesLeftLine(state, locale),
     )
+}
+
+/** A run that ended at a limit is normal progress: how many files are left, never run counts. */
+private fun filesLeftLine(state: BackupUiState, locale: Locale): String? {
+    if (state.stopReason == null || state.filesLeft <= 0) return null
+    val count = java.text.NumberFormat.getIntegerInstance(locale).format(state.filesLeft)
+    return if (state.filesLeft == 1) "$count file left" else "$count files left"
 }
 
 /** Everything in the Camera folder is Backed up, so there is nothing to start until a new photo appears. */
@@ -170,16 +181,7 @@ private fun primaryLabel(state: BackupUiState): String {
     if (status is BackupStatus.Paused && status.reason == PauseReason.DriveOut && state.driveStatus == DriveStatus.Ready) {
         return "Continue backing up"
     }
-    return startLabel(state.fileCap, more)
-}
-
-private fun startLabel(fileCap: Int, more: Boolean): String {
-    val files = if (fileCap == 1) "file" else "files"
-    return if (more) {
-        "Back up $fileCap more $files"
-    } else {
-        "Back up $fileCap $files"
-    }
+    return if (more) "Back up more" else "Back up"
 }
 
 private fun progressFraction(state: BackupUiState): Float? {

@@ -49,6 +49,10 @@ data class BackupRunResult(
     val manifestPath: String,
     val items: List<BackupItemOutcome>,
     val status: BackupRunStatus = BackupRunStatus.Completed,
+    /** Why the run ended before every Original was Backed up; null when nothing was left behind. */
+    val stopReason: StopReason? = null,
+    /** How many Originals still need copying when the run stopped for [stopReason]. */
+    val filesLeft: Int = 0,
 )
 
 class BackupRunner(
@@ -60,7 +64,7 @@ class BackupRunner(
     private val backedUpLedger: BackedUpLedger = InMemoryBackedUpLedger(),
     private val previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     private val newDriveId: () -> String = { UUID.randomUUID().toString() },
-    private val fileCap: Int? = null,
+    private val stopPolicy: StopPolicy = DefaultStopPolicy(),
     private val previewPreset: PreviewPreset? = null,
     private val isCancelled: () -> Boolean = { false },
 ) {
@@ -106,7 +110,8 @@ class BackupRunner(
                 committed = committed,
                 manifest = manifest,
             )
-            var copies = 0
+            var copiedBytes = 0L
+            var stopReason: StopReason? = null
             var committedCount = 0
             var committedBytes = 0L
             for (file in files) {
@@ -120,9 +125,17 @@ class BackupRunner(
                         manifestHasNoFileLine = linesByHash.isEmpty(),
                     )
                 }
-                val allowNewCopy = fileCap == null || copies < fileCap
-                val copied = copier.copy(file, allowNewCopy)
+                // Once the run decides to stop, it only finishes Originals that need no new copy.
+                val reasonNow = stopReason ?: stopPolicy.reasonToStop(
+                    RunProgress(
+                        copiedBytes = copiedBytes,
+                        elapsed = Duration.between(startedAt, clock.instant()),
+                        nextFileBytes = file.sizeBytes,
+                    ),
+                )
+                val copied = copier.copy(file, allowNewCopy = reasonNow == null)
                 if (copied.deferredByCap) {
+                    stopReason = reasonNow
                     deferred += file.id
                     continue
                 }
@@ -134,7 +147,7 @@ class BackupRunner(
                     committedBytes += file.sizeBytes
                 }
                 if (copied.copiedFile) {
-                    copies += 1
+                    copiedBytes += file.sizeBytes
                 }
                 items += copied.outcome
             }
@@ -143,7 +156,13 @@ class BackupRunner(
                 manifestPath,
                 footerLine(startedAt, endedAt, committedCount, committedBytes) + "\n",
             )
-            return BackupRunResult(manifestPath, items, BackupRunStatus.Completed)
+            return BackupRunResult(
+                manifestPath = manifestPath,
+                items = items,
+                status = BackupRunStatus.Completed,
+                stopReason = stopReason,
+                filesLeft = deferred.size,
+            )
         } catch (_: DriveUnavailableException) {
             return pausedResult(manifestPath, files, items, deferred)
         }
@@ -244,7 +263,7 @@ fun startBackupRun(
     backedUpLedger: BackedUpLedger = InMemoryBackedUpLedger(),
     previews: PreviewRecordStore = InMemoryPreviewRecordStore(),
     newDriveId: () -> String = { UUID.randomUUID().toString() },
-    fileCap: Int? = null,
+    stopPolicy: StopPolicy = DefaultStopPolicy(),
     previewPreset: PreviewPreset? = null,
 ): BackupRunResult {
     return BackupRunner(
@@ -256,7 +275,7 @@ fun startBackupRun(
         backedUpLedger = backedUpLedger,
         previews = previews,
         newDriveId = newDriveId,
-        fileCap = fileCap,
+        stopPolicy = stopPolicy,
         previewPreset = previewPreset,
     ).start()
 }

@@ -71,7 +71,6 @@ class BackupController private constructor(
             // The phone's cache of Backed up Originals survives a restart; the drive stays the truth.
             backedUpCount = settings.ledgerEntries().size,
             lastBackedUpAtEpochMillis = settings.lastBackedUpAtEpochMillis(),
-            fileCap = settings.fileCap(),
         ),
     )
     val state: StateFlow<BackupUiState> = _state.asStateFlow()
@@ -89,19 +88,14 @@ class BackupController private constructor(
         )
     }
 
-    fun start(fileCap: Int = settings.fileCap()) {
-        val cap = if (fileCap < 1) DEFAULT_FILE_CAP else fileCap
-        settings.setFileCap(cap)
-        if (runJob?.isActive == true) {
-            _state.update { it.copy(fileCap = cap) }
-            return
-        }
+    fun start() {
+        if (runJob?.isActive == true) return
         userStop.set(false)
         cancel.set(false)
         pauseReason.set(PauseReason.User)
         val blocked = currentSessionAccess()
         if (blocked != null) {
-            refuseSessionAccess(blocked, cap)
+            refuseSessionAccess(blocked)
             return
         }
         val uri = settings.treeUri()
@@ -109,7 +103,6 @@ class BackupController private constructor(
             _state.update {
                 it.copy(
                     status = BackupStatus.Idle,
-                    fileCap = cap,
                     driveStatus = DriveStatus.Absent,
                     message = MESSAGE_CHOOSE_DRIVE,
                     sessionAccess = null,
@@ -123,7 +116,6 @@ class BackupController private constructor(
                 it.copy(
                     status = BackupStatus.Paused(PauseReason.DriveOut),
                     driveStatus = drive,
-                    fileCap = cap,
                     message = MESSAGE_DRIVE_OUT,
                     sessionAccess = null,
                 )
@@ -131,7 +123,7 @@ class BackupController private constructor(
             return
         }
         _state.update {
-            it.runStarted(totalCount = it.totalCount, fileCap = cap, driveStatus = drive)
+            it.runStarted(totalCount = it.totalCount, driveStatus = drive)
                 .copy(sessionAccess = null, backedUpCount = it.backedUpCount)
         }
         try {
@@ -169,13 +161,12 @@ class BackupController private constructor(
             if (runJob?.isActive == true) return
             val blocked = currentSessionAccess()
             if (blocked != null) {
-                refuseSessionAccess(blocked, settings.fileCap())
+                refuseSessionAccess(blocked)
                 stopService()
                 return
             }
             val uri = settings.treeUri() ?: return
             cancel.set(false)
-            val cap = settings.fileCap()
             runJob = scope.launch {
                 settings.setRunActive(true)
                 // Free space on the drive shifts as files land; keep Home's number fresh during a long run.
@@ -187,7 +178,7 @@ class BackupController private constructor(
                     }
                 }
                 try {
-                    executeRun(uri, cap)
+                    executeRun(uri)
                 } finally {
                     spaceTicker.cancel()
                     settings.setRunActive(false)
@@ -280,7 +271,7 @@ class BackupController private constructor(
         _state.update { it.copy(message = MESSAGE_CONNECTED_DEVICE_FALLBACK) }
     }
 
-    private suspend fun executeRun(uri: Uri, cap: Int) {
+    private suspend fun executeRun(uri: Uri) {
         if (shouldAbandon()) {
             finishAbandoned()
             return
@@ -306,7 +297,6 @@ class BackupController private constructor(
         _state.update {
             it.runStarted(
                 totalCount = total,
-                fileCap = cap,
                 driveStatus = it.driveStatus,
                 bytesToCopy = bytesToCopy,
             ).copy(backedUpCount = alreadyBackedUp)
@@ -320,7 +310,6 @@ class BackupController private constructor(
                         archiveDrive = SafArchiveDrive(appContext, uri),
                         driveIdentity = settings,
                         backedUpLedger = progressLedger(recorded, sizeById),
-                        fileCap = cap,
                         previewPreset = settings.previewPreset(),
                         isCancelled = { cancel.get() },
                     ).start()
@@ -518,7 +507,7 @@ class BackupController private constructor(
         return appContext.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun refuseSessionAccess(access: SessionAccess, fileCap: Int) {
+    private fun refuseSessionAccess(access: SessionAccess) {
         _state.update {
             val status = when (it.status) {
                 BackupStatus.NeedsAttention -> BackupStatus.NeedsAttention
@@ -526,7 +515,6 @@ class BackupController private constructor(
             }
             it.copy(
                 status = status,
-                fileCap = fileCap,
                 sessionAccess = access,
                 message = sessionAccessMessage(access),
             )
