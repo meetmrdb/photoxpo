@@ -14,6 +14,7 @@ import app.photoxpo.core.BackupRunStatus
 import app.photoxpo.core.BackupRunner
 import app.photoxpo.core.DriveFullException
 import app.photoxpo.core.BackedUpLedger
+import app.photoxpo.core.MediaFile
 import app.photoxpo.core.ItemState
 import app.photoxpo.PhotoxpoApp
 import app.photoxpo.data.DriveStatus
@@ -485,6 +486,13 @@ class BackupController private constructor(
                     }
                 }
             }
+
+            override fun recordChecked(file: MediaFile, hash: String, checkedAt: java.time.Instant) {
+                record(file.id, hash)
+                settings.recordChecked(file, hash, checkedAt)
+            }
+
+            override fun checkedOriginal(mediaId: String) = settings.checkedOriginal(mediaId)
 
             override fun clear() {
                 settings.clear()
