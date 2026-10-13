@@ -33,6 +33,9 @@ enum class StopReason {
     SizeLimit,
     TimeLimit,
     LowBattery,
+
+    /** The Archive Drive has no room for the next Original. Raised by the run on [DriveFullException], not by a policy. */
+    DriveFull,
 }
 
 /** What the run knows when it is about to copy one more Original. */

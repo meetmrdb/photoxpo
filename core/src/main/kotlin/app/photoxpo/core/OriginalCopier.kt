@@ -203,10 +203,16 @@ internal class OriginalCopier(
             CreateResult.Created -> Unit
             is CreateResult.Collision -> return null
         }
-        val copied = mediaSource.openOriginal(file.id).use { input ->
-            archiveDrive.write(partPath).use { output ->
-                copyHashed(input, output)
+        val copied = try {
+            mediaSource.openOriginal(file.id).use { input ->
+                archiveDrive.write(partPath).use { output ->
+                    copyHashed(input, output)
+                }
             }
+        } catch (full: DriveFullException) {
+            // No half-copied Original is left on the Archive Drive.
+            runCatching { archiveDrive.delete(partPath) }
+            throw full
         }
         val readBack = archiveDrive.read(partPath).use { input ->
             copyHashed(input, OutputStream.nullOutputStream())

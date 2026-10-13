@@ -28,6 +28,8 @@ class FakeArchiveDrive(
     private val root: Path,
     private val corruptReadBack: Boolean = false,
     private val wrongByteCount: Boolean = false,
+    /** When set, writes past this many bytes in total on the fake drive throw [DriveFullException]. */
+    private val capacityBytes: Long? = null,
 ) : ArchiveDrive {
     private var stepHits = 0
 
@@ -62,11 +64,12 @@ class FakeArchiveDrive(
 
     override fun write(path: String): OutputStream {
         writeCalls += 1
-        val base = Files.newOutputStream(
+        val raw = Files.newOutputStream(
             resolve(path),
             StandardOpenOption.WRITE,
             StandardOpenOption.TRUNCATE_EXISTING,
         )
+        val base = if (capacityBytes == null) raw else CapacityOutputStream(raw) { usedBytes() + it > capacityBytes }
         if (!isPart(path)) return base
         val fault = take(DriveFaultStep.MID_WRITE) ?: take(DriveFaultStep.AFTER_WRITE)
         return if (fault == null) base else FaultingOutputStream(base, fault)
@@ -139,6 +142,10 @@ class FakeArchiveDrive(
 
     override fun delete(path: String) {
         Files.deleteIfExists(resolve(path))
+    }
+
+    private fun usedBytes(): Long = Files.walk(root).use { stream ->
+        stream.filter { Files.isRegularFile(it) }.mapToLong { Files.size(it) }.sum()
     }
 
     private fun take(step: DriveFaultStep): DriveFault? {
@@ -269,6 +276,22 @@ private class UnavailableAfterBytesInputStream(
     override fun close() {
         delegate.close()
     }
+}
+
+private class CapacityOutputStream(
+    private val delegate: OutputStream,
+    private val wouldOverflow: (Long) -> Boolean,
+) : OutputStream() {
+    override fun write(b: Int) = write(byteArrayOf(b.toByte()), 0, 1)
+
+    override fun write(buffer: ByteArray, off: Int, len: Int) {
+        if (wouldOverflow(len.toLong())) throw DriveFullException()
+        delegate.write(buffer, off, len)
+    }
+
+    override fun flush() = delegate.flush()
+
+    override fun close() = delegate.close()
 }
 
 private class FirstByteFlippingInputStream(

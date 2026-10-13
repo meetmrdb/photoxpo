@@ -148,6 +148,25 @@ class BackupUiStateTest {
     }
 
     @Test
+    fun runStoppedBecauseTheDriveIsFull_isTheDriveFullStatusWithFilesLeft_notAnError() {
+        val next = reduceBackupRun(
+            state = BackupUiState(totalCount = 5, driveStatus = DriveStatus.Ready),
+            result = BackupRunResult(
+                manifestPath = "Photoxpo/.photoxpo/runs/run.jsonl",
+                items = listOf(item("a", ItemState.COMMITTED), item("b", ItemState.COMMITTED)),
+                status = BackupRunStatus.Completed,
+                stopReason = StopReason.DriveFull,
+                filesLeft = 3,
+            ),
+            nowEpochMillis = 50L,
+        )
+        assertEquals(BackupStatus.DriveFull, next.status)
+        assertEquals(StopReason.DriveFull, next.stopReason)
+        assertEquals(3, next.filesLeft)
+        assertNull(next.message)
+    }
+
+    @Test
     fun runStoppedAtALimit_isDoneWithFilesLeft_notAnErrorOrAMessage() {
         val next = reduceBackupRun(
             state = BackupUiState(totalCount = 5, driveStatus = DriveStatus.Ready),

@@ -179,7 +179,8 @@ fun reduceBackupRun(
     val status = when (result.status) {
         BackupRunStatus.Paused -> BackupStatus.Paused(pauseReason)
         BackupRunStatus.Completed ->
-            if (needsAttention) BackupStatus.NeedsAttention else BackupStatus.Done
+            if (result.stopReason == StopReason.DriveFull) BackupStatus.DriveFull
+            else if (needsAttention) BackupStatus.NeedsAttention else BackupStatus.Done
         BackupRunStatus.DriveMismatch -> BackupStatus.DriveMismatch
     }
     val message = when {
