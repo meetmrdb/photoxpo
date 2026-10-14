@@ -158,11 +158,22 @@ internal const val PULL_HINT = "Pull down to check for new photos"
 private const val EVERYTHING_SAFE = "Everything on your phone is safe on your Archive Drive."
 private const val NORMAL_STOP = "That is a normal stop. Back up more continues where it left off."
 
+internal const val CHECKING_FOR_NEW = "Checking for new photos…"
+
+/** Home has not counted the Camera folder yet, so "Back up" has no number to show. */
+internal fun checkingForNew(state: BackupUiState): Boolean {
+    val settled = state.status == BackupStatus.Idle || state.status == BackupStatus.Done
+    return settled && state.driveStatus == DriveStatus.Ready && state.filesToCopy == null &&
+        state.sessionAccess == null
+}
+
 private fun heroSubline(state: BackupUiState, locale: Locale): String? {
     if (allBackedUp(state)) return EVERYTHING_SAFE
-    val atALimit = stopHeadline(state, locale) != null &&
+    val stopped = stopHeadline(state, locale) != null
+    val atALimit = stopped &&
         (state.stopReason == StopReason.SizeLimit || state.stopReason == StopReason.TimeLimit)
-    return if (atALimit) NORMAL_STOP else null
+    if (atALimit) return NORMAL_STOP
+    return if (!stopped && checkingForNew(state)) CHECKING_FOR_NEW else null
 }
 
 /** Everything in the Camera folder is Backed up, so there is nothing to start until a new photo appears. */

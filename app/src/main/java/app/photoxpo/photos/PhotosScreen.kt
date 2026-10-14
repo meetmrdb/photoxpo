@@ -344,8 +344,9 @@ private fun PhotoTile(
                     tint = PhotoOverlay.OnScrim,
                     modifier = Modifier.size(12.dp),
                 )
+                val length by rememberVideoDuration(photo.mediaId)
                 Text(
-                    text = "Video",
+                    text = length ?: "Video",
                     style = MaterialTheme.typography.labelMedium,
                     color = PhotoOverlay.OnScrim,
                 )
