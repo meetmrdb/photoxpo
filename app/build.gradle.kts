@@ -1,8 +1,18 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+// The upload key lives outside the repo. Without it the release build is left unsigned, which CI does not need.
+val keystoreProperties = Properties().apply {
+    val path = System.getenv("PHOTOXPO_KEYSTORE_PROPERTIES")
+        ?: "${System.getProperty("user.home")}/.android-keys/photoxpo-keystore.properties"
+    val file = File(path)
+    if (file.isFile) file.inputStream().use { load(it) }
 }
 
 android {
@@ -18,9 +28,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (keystoreProperties.containsKey("storeFile")) {
+            create("upload") {
+                storeFile = File(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.findByName("upload")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
