@@ -448,6 +448,15 @@ class HomeUiModelTest {
     }
 
     @Test
+    fun beforeTheFirstCount_saysItIsChecking_butNotWhenThereIsNothingToCount() {
+        assertEquals(CHECKING_FOR_NEW, homeUiModel(base(backedUpCount = 12), NOW).heroSubline)
+        assertNull(homeUiModel(base(driveStatus = DriveStatus.Absent), NOW).heroSubline)
+        assertNull(homeUiModel(base(sessionAccess = SessionAccess.DeniedPhotos), NOW).heroSubline)
+        assertNull(homeUiModel(base(status = BackupStatus.Running), NOW).heroSubline)
+        assertNull(homeUiModel(base().copy(filesToCopy = 3), NOW).heroSubline)
+    }
+
+    @Test
     fun nothingLeft_saysEverythingIsSafe_andHintsAtPullDown() {
         val done = homeUiModel(base(backedUpCount = 12, totalCount = 12).copy(filesToCopy = 0), NOW)
         assertEquals("Everything on your phone is safe on your Archive Drive.", done.heroSubline)
