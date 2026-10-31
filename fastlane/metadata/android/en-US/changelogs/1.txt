@@ -1,0 +1,1 @@
+First release: back up photos and videos to a USB drive, check every copy, browse Previews with the drive unplugged, and Load Originals back.

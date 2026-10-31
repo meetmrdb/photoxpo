@@ -17,12 +17,12 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "app.photoxpo"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "app.photoxpo"
         minSdk = 34
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
