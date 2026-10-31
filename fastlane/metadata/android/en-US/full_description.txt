@@ -1,0 +1,18 @@
+Photoxpo backs up your phone's photos and videos to a USB drive you own. There is no cloud, no account and no subscription, and nothing leaves your phone except onto your drive.
+
+<b>How it works</b>
+Plug in a USB-C drive or memory stick, pick a folder on it, and tap Back up. Photoxpo copies each full-quality Original to the drive, reads it back to check the copy is exact, and only then marks it Backed up.
+
+<b>Your library, even with the drive unplugged</b>
+Photoxpo keeps a small Preview of every photo on your phone, so you can browse your whole library by month without the drive. When you want the full-quality Original, plug the drive in and tap Load.
+
+<b>Safe by design</b>
+• Photoxpo only reads your photos. It never changes or deletes anything on your phone.
+• Every copy is checked against the original before it counts as Backed up.
+• Big libraries back up in stages. Pause or unplug any time, and the next run carries on where the last one stopped.
+• Runs stop cleanly when the battery gets low or the drive is full, and tell you how many files are left.
+
+<b>Private</b>
+No ads, no analytics, no account, and no internet permission. Photoxpo is free and open source under the GPL v3.
+
+Needs Android 14 or newer and a USB-C drive or memory stick (or a USB drive with a USB-C adapter).
