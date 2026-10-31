@@ -23,8 +23,8 @@ android {
         applicationId = "app.photoxpo"
         minSdk = 34
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -62,6 +62,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    // The dependency list is encrypted for Google only. Play still gets it in the bundle; the APK for other stores leaves it out.
+    dependenciesInfo {
+        includeInApk = false
     }
 }
 
